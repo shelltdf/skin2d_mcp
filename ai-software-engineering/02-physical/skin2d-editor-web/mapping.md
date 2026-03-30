@@ -18,7 +18,7 @@
 | Spine JSON 解析 | `skin2d-editor/src/importers/spine.ts` |
 | Live2D model3.json | `skin2d-editor/src/importers/live2d.ts` |
 | Live2D zip 元数据提取 | `skin2d-editor/src/live2d/extractZipModel3.ts` |
-| Live2D 运行时（ZipLoader + pixi-live2d-display） | `skin2d-editor/src/stores/live2dRuntime.ts` |
+| Live2D 运行时（JSZip 注册 ZipLoader + pixi-live2d-display） | `skin2d-editor/src/stores/live2dRuntime.ts`、`skin2d-editor/src/live2d/registerPixiZipLoader.ts` |
 | Live2D 视口挂载 | `skin2d-editor/src/components/Live2DViewport.vue` |
 | DragonBones 解析 | `skin2d-editor/src/importers/dragonbones.ts` |
 | dbproj 工程归一化 / 导入 | `skin2d-editor/src/importers/dbproj.ts` |

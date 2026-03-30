@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { computed, ref, shallowRef } from 'vue'
 import type { ImportResult } from '../importers/types'
 import { extractLive2dMetaFromZip } from '../live2d/extractZipModel3'
+import { ensurePixiLive2dZipLoader } from '../live2d/registerPixiZipLoader'
 import { useAppLogStore } from './appLog'
 import { useEditorStore } from './editor'
 import { useUiSettingsStore } from './uiSettings'
@@ -13,12 +14,21 @@ export const useLive2dRuntimeStore = defineStore('live2dRuntime', () => {
 
   let pixiApp: import('pixi.js').Application | null = null
   let resizeObs: ResizeObserver | null = null
+  /** 与 fit 同步的视口平移/缩放（像素偏移 + 倍数），供 Live2D 层绑定鼠标 */
+  const live2dPanX = ref(0)
+  const live2dPanY = ref(0)
+  const live2dZoomMul = ref(1)
+  let relayoutLive2d: (() => void) | null = null
 
   const showViewport = computed(() => pendingZip.value !== null || ready.value)
 
   function dispose() {
     resizeObs?.disconnect()
     resizeObs = null
+    relayoutLive2d = null
+    live2dPanX.value = 0
+    live2dPanY.value = 0
+    live2dZoomMul.value = 1
     try {
       pixiApp?.destroy(true, { children: true, texture: true })
     } catch {
@@ -70,7 +80,8 @@ export const useLive2dRuntimeStore = defineStore('live2dRuntime', () => {
       }
 
       const PIXI = await import('pixi.js')
-      const { Live2DModel } = await import('pixi-live2d-display/cubism4')
+      const { Live2DModel, ZipLoader } = await import('pixi-live2d-display/cubism4')
+      ensurePixiLive2dZipLoader(ZipLoader)
       ;(window as unknown as { PIXI: typeof PIXI }).PIXI = PIXI
       Live2DModel.registerTicker(PIXI.Ticker)
 
@@ -88,21 +99,50 @@ export const useLive2dRuntimeStore = defineStore('live2dRuntime', () => {
       container.appendChild(app.view as HTMLCanvasElement)
       pixiApp = app
 
-      const model = await Live2DModel.from([zipFile], { autoInteract: false })
-      app.stage.addChild(model)
+      const viewRoot = new PIXI.Container()
+      app.stage.addChild(viewRoot)
 
+      const model = await Live2DModel.from([zipFile], { autoInteract: true })
+      viewRoot.addChild(model)
+      model.anchor.set(0.5, 0.5)
+      model.position.set(0, 0)
+
+      live2dPanX.value = 0
+      live2dPanY.value = 0
+      live2dZoomMul.value = 1
+
+      /** 仅当容器尺寸变化时重算；用 Cubism 逻辑画布尺寸，避免 model.width/height（含 scale + 动画）导致缩放正反馈闪烁 */
+      let fitBaseScale = 1
+      let lastLayoutCw = 0
+      let lastLayoutCh = 0
+
+      function recomputeFitBase(cw: number, ch: number) {
+        const im = (model as unknown as { internalModel?: { width?: number; height?: number } })
+          .internalModel
+        const bw = Math.max(1, im?.width ?? 400)
+        const bh = Math.max(1, im?.height ?? 400)
+        const pad = 0.88
+        fitBaseScale = Math.min((cw * pad) / bw, (ch * pad) / bh, 4)
+        lastLayoutCw = cw
+        lastLayoutCh = ch
+      }
+
+      /**
+       * 平移/缩放只动 viewRoot（相机）与 model.scale；model.position 恒为 (0,0)。
+       * 这样 focus(屏幕→模型) 的世界矩阵自洽，与中键拖移不再打架，无需关 autoInteract。
+       */
       function fit() {
         const cw = Math.max(320, container.clientWidth)
         const ch = Math.max(240, container.clientHeight)
         app.renderer.resize(cw, ch)
-        const bw = model.width || 1
-        const bh = model.height || 1
-        const pad = 0.88
-        const s = Math.min((cw * pad) / bw, (ch * pad) / bh, 4)
+        if (cw !== lastLayoutCw || ch !== lastLayoutCh) {
+          recomputeFitBase(cw, ch)
+        }
+        const s = fitBaseScale * live2dZoomMul.value
         model.scale.set(s)
-        model.anchor.set(0.5, 0.5)
-        model.position.set(cw / 2, ch / 2)
+        viewRoot.position.set(cw / 2 + live2dPanX.value, ch / 2 + live2dPanY.value)
       }
+      relayoutLive2d = fit
       fit()
 
       resizeObs = new ResizeObserver(() => fit())
@@ -144,6 +184,31 @@ export const useLive2dRuntimeStore = defineStore('live2dRuntime', () => {
     }
   }
 
+  /** 滚轮缩放（强度与 Spine 视口相近）；以模型中心为基准，需在 Live2D 容器上监听 */
+  function live2dOnWheel(e: WheelEvent) {
+    if (!relayoutLive2d) return
+    const zoomIntensity = 0.0015
+    const delta = -e.deltaY * zoomIntensity
+    const factor = Math.exp(delta)
+    live2dZoomMul.value = Math.min(8, Math.max(0.08, live2dZoomMul.value * factor))
+    relayoutLive2d()
+  }
+
+  function live2dOnPanDelta(dx: number, dy: number) {
+    if (!relayoutLive2d) return
+    live2dPanX.value += dx
+    live2dPanY.value += dy
+    relayoutLive2d()
+  }
+
+  function live2dResetView() {
+    if (!relayoutLive2d) return
+    live2dPanX.value = 0
+    live2dPanY.value = 0
+    live2dZoomMul.value = 1
+    relayoutLive2d()
+  }
+
   return {
     pendingZip,
     ready,
@@ -153,5 +218,8 @@ export const useLive2dRuntimeStore = defineStore('live2dRuntime', () => {
     dispose,
     queueZip,
     mountInto,
+    live2dOnWheel,
+    live2dOnPanDelta,
+    live2dResetView,
   }
 })

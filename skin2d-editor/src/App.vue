@@ -386,7 +386,9 @@ onUnmounted(() => {
               </button>
               <button type="button" class="chooser-item" @click="closeImportChooser(); triggerTypedImport('dragonbones')">
                 <div class="ci-main">DragonBones</div>
-                <div class="ci-sub">{{ t('单选：.dbproj 或 *_ske.json', 'Single: .dbproj or *_ske.json') }}</div>
+                <div class="ci-sub">{{
+                  t('单选：优先 *_ske.json；仅文本型 .dbproj 可解析', 'Single: prefer *_ske.json; text .dbproj only if JSON')
+                }}</div>
               </button>
               <button type="button" class="chooser-item" @click="closeImportChooser(); triggerTypedImport('gltf')">
                 <div class="ci-main">glTF</div>

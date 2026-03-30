@@ -3,8 +3,11 @@ import { emptyResult } from './types'
 import { parseDragonBonesJson } from './dragonbones'
 
 /**
- * DragonBonesPro / LoongBones 等生成的 .dbproj 多为 UTF-8 JSON，
- * 骨架数据可能在根上，也可能包在 dragonBones / library / document 等节点下。
+ * `.dbproj` 在不同编辑器/版本下可能是：
+ * - 文本 UTF-8 JSON（本函数可尝试归一化并解析）
+ * - 二进制或 ZIP 等封装（常见）：浏览器端无法用 JSON.parse，须用户在编辑器中导出可读骨架 `*_ske.json`
+ *
+ * 文本型 dbproj 的骨架可能在根上，也可能包在 dragonBones / library / document 等节点下。
  */
 export function normalizeDbProjObject(raw: unknown): Record<string, unknown> | null {
   if (!raw || typeof raw !== 'object') return null
@@ -99,8 +102,7 @@ export function tryParseDbprojObject(obj: unknown, fileLabel: string): ImportRes
 
 export function parseDbprojText(text: string, fileLabel: string): ImportResult {
   const t = text.replace(/^\uFEFF/, '').trimStart()
-  // Heuristics: some editors produce binary/packed/encrypted project files.
-  // `File.text()` will still return a string, but it won't be valid JSON.
+  // 许多 `.dbproj` 为二进制/ZIP；`File.text()` 读入后仍无法 JSON.parse，属预期情况，应引导导出 *_ske.json。
   const head = t.slice(0, 64)
   const hasNul = text.includes('\u0000')
   const looksLikeZip = head.startsWith('PK') // ZIP magic
@@ -110,16 +112,16 @@ export function parseDbprojText(text: string, fileLabel: string): ImportResult {
   } catch {
     if (looksLikeZip) {
       return emptyResult([
-        `dbproj：看起来是 ZIP/压缩包（以 "PK" 开头），不是可直接解析的 JSON（${fileLabel}）。请在编辑器中导出可读的骨架 JSON（如 *_ske.json）。`,
+        `dbproj：该文件为 ZIP/压缩封装工程（${fileLabel}），不是文本 JSON。本工具只解析 UTF-8 骨架文本，请在 DragonBones / LoongBones 中导出 *_ske.json（或文本型工程）后再导入。`,
       ])
     }
     if (hasNul) {
       return emptyResult([
-        `dbproj：检测到二进制内容（包含 NUL 字节），不是可直接解析的 JSON（${fileLabel}）。请在编辑器中导出可读的骨架 JSON（如 *_ske.json）。`,
+        `dbproj：该文件含二进制数据（${fileLabel}），属于正常现象——多数 .dbproj 并非 JSON。本工具只支持文本骨架；请从编辑器导出 *_ske.json（或可读的文本工程）后再导入。`,
       ])
     }
     return emptyResult([
-      `dbproj：不是合法 JSON（${fileLabel}）。若为二进制或加密工程，请从编辑器导出 _ske.json。`,
+      `dbproj：无法作为文本 JSON 解析（${fileLabel}）。若为二进制或专有工程，请导出 *_ske.json；若确为 JSON，请检查编码是否为 UTF-8。`,
     ])
   }
 

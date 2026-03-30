@@ -22,6 +22,7 @@
 
 - 应用内日志：Pinia `appLog` 收集导入/运行时/全屏等操作、警告与错误；状态栏显示最新一条，点击打开日志窗口。
 - Vue 运行时错误：在 `main.ts` 的 `errorHandler` 中写入 `appLog`（便于在纯前端环境定位问题）。
+- **Live2D zip**：依赖 `skin2d-editor/index.html` 引入的 **Cubism Core**（`Live2DCubismCore`）；依赖 **`jszip`** + `src/live2d/registerPixiZipLoader.ts` 为 `pixi-live2d-display` 注册 `ZipLoader`。缺任一项会表现为预览失败或控制台/日志中相关错误。
 
 ## UI 设置
 

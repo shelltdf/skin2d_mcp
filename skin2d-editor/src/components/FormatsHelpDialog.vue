@@ -221,8 +221,8 @@ onUnmounted(() => {
               <li>
                 <strong>{{ t('内容', 'Content') }}</strong>：{{
                   t(
-                    'DragonBonesPro、LoongBones 等生成的工程文件（一般为 UTF-8 JSON）。骨架可能位于 armature、dragonBones、library 等节点下，导入时会尝试归一化。',
-                    'Project file from DragonBonesPro/LoongBones (usually UTF-8 JSON). The rig may be under armature/dragonBones/library, and import will try to normalize structures.',
+                    'DragonBonesPro、LoongBones 等的工程文件。常见为二进制或 ZIP 封装，浏览器内无法用 JSON 打开；部分旧版/导出可能是 UTF-8 文本 JSON，骨架可能在 armature、dragonBones、library 等节点，导入时会尝试归一化。',
+                    'Project files from DragonBonesPro/LoongBones are often binary or ZIP-wrapped and cannot be treated as JSON in the browser; some exports may be UTF-8 text JSON with rigs under armature/dragonBones/library—import normalizes when possible.',
                   )
                 }}
               </li>
@@ -230,8 +230,8 @@ onUnmounted(() => {
               <li>
                 <strong>{{ t('注意', 'Note') }}</strong>：{{
                   t(
-                    '不包含贴图资源；若为二进制或非 JSON 封装，无法解析，请改导出 *_ske.json。无法识别时请核对编辑器版本或提供可复现的 JSON 结构（脱敏）。',
-                    'Does not include textures. If the file is binary or non-JSON, it cannot be parsed—export *_ske.json instead. If unrecognized, verify editor version or provide a reproducible (sanitized) JSON structure.',
+                    '推荐直接导出并导入 *_ske.json（运行时骨架）。不包含贴图；二进制 .dbproj 无法解析。若文本型仍无法识别，请核对编辑器版本或提供可复现的 JSON 结构（脱敏）。',
+                    'Prefer exporting and importing *_ske.json (runtime skeleton). No textures embedded; binary .dbproj cannot be parsed. If text export still fails, verify editor version or share a reproducible (sanitized) JSON.',
                   )
                 }}
               </li>
