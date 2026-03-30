@@ -1,4 +1,4 @@
-export type ImportFormatId = 'spine-json' | 'dragonbones' | 'gltf' | 'unknown'
+export type ImportFormatId = 'spine-json' | 'dragonbones' | 'gltf' | 'live2d' | 'unknown'
 
 /** 画布绘制用：骨骼世界坐标（与 Spine 运行时一致） */
 export interface RigPreviewBone {

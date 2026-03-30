@@ -1,15 +1,22 @@
 <script setup lang="ts">
 import { SkeletonRenderer } from '@esotericsoftware/spine-canvas'
-import type { Skeleton } from '@esotericsoftware/spine-core'
+import { MeshAttachment, Physics, RegionAttachment } from '@esotericsoftware/spine-core'
+import type { Skeleton, Slot } from '@esotericsoftware/spine-core'
 import { onMounted, onUnmounted, ref, watch } from 'vue'
 import type { RigPreviewBone } from '../importers/types'
+import { drawSpineMeshAttachments, drawSpineRegionAttachments, drawSpineRegionWires } from '../spine/spineAttachmentLayers'
 import { useEditorStore } from '../stores/editor'
 import { useSpineRuntimeStore } from '../stores/spineRuntime'
+import { useLive2dRuntimeStore } from '../stores/live2dRuntime'
+import Live2DViewport from './Live2DViewport.vue'
+import { useHierarchySelectionStore } from '../stores/hierarchySelection'
 import { useViewportDisplayStore } from '../stores/viewportDisplay'
 
 const store = useEditorStore()
 const spineStore = useSpineRuntimeStore()
+const live2dStore = useLive2dRuntimeStore()
 const display = useViewportDisplayStore()
+const hierarchySel = useHierarchySelectionStore()
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 let skRenderer: SkeletonRenderer | null = null
 
@@ -38,6 +45,105 @@ function worldToScreen(wx: number, wy: number, w: number, h: number) {
     x: w / 2 + (wx - cameraCx.value) * s,
     y: h / 2 + (wy - cameraCy.value) * s,
   }
+}
+
+function screenToWorld(sx: number, sy: number, w: number, h: number) {
+  const s = viewScale.value
+  return {
+    x: cameraCx.value + (sx - w / 2) / s,
+    y: cameraCy.value + (sy - h / 2) / s,
+  }
+}
+
+function pointInTri(
+  px: number,
+  py: number,
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+  cx: number,
+  cy: number,
+): boolean {
+  const v0x = cx - ax
+  const v0y = cy - ay
+  const v1x = bx - ax
+  const v1y = by - ay
+  const v2x = px - ax
+  const v2y = py - ay
+  const dot00 = v0x * v0x + v0y * v0y
+  const dot01 = v0x * v1x + v0y * v1y
+  const dot02 = v0x * v2x + v0y * v2y
+  const dot11 = v1x * v1x + v1y * v1y
+  const dot12 = v1x * v2x + v1y * v2y
+  const invDen = 1 / (dot00 * dot11 - dot01 * dot01 + 1e-12)
+  const u = (dot11 * dot02 - dot01 * dot12) * invDen
+  const v = (dot00 * dot12 - dot01 * dot02) * invDen
+  return u >= 0 && v >= 0 && u + v <= 1
+}
+
+function pointInQuad(
+  px: number,
+  py: number,
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  x3: number,
+  y3: number,
+): boolean {
+  return (
+    pointInTri(px, py, x0, y0, x1, y1, x2, y2) || pointInTri(px, py, x0, y0, x2, y2, x3, y3)
+  )
+}
+
+function pickTopmostSlotAtWorldPoint(sk: Skeleton, wx: number, wy: number): Slot | null {
+  // drawOrder is back->front; scan reverse for topmost.
+  const order = sk.drawOrder
+  const quad = new Float32Array(8)
+  let meshBuf: Float32Array | null = null
+  for (let i = order.length - 1; i >= 0; i--) {
+    const slot = order[i]
+    const att = slot.getAttachment()
+    if (!att) continue
+
+    if (att instanceof RegionAttachment) {
+      att.computeWorldVertices(slot, quad, 0, 2)
+      if (pointInQuad(wx, wy, quad[0], quad[1], quad[2], quad[3], quad[4], quad[5], quad[6], quad[7])) {
+        return slot
+      }
+      continue
+    }
+
+    if (att instanceof MeshAttachment) {
+      const count = att.worldVerticesLength
+      if (!meshBuf || meshBuf.length < count) meshBuf = new Float32Array(count)
+      att.computeWorldVertices(slot, 0, count, meshBuf, 0, 2)
+      const tris = att.triangles
+      for (let t = 0; t < tris.length; t += 3) {
+        const i0 = tris[t] * 2
+        const i1 = tris[t + 1] * 2
+        const i2 = tris[t + 2] * 2
+        if (
+          pointInTri(
+            wx,
+            wy,
+            meshBuf[i0],
+            meshBuf[i0 + 1],
+            meshBuf[i1],
+            meshBuf[i1 + 1],
+            meshBuf[i2],
+            meshBuf[i2 + 1],
+          )
+        ) {
+          return slot
+        }
+      }
+    }
+  }
+  return null
 }
 
 function rigBonesFromSkeleton(sk: Skeleton): RigPreviewBone[] {
@@ -157,7 +263,13 @@ function drawWorldGrid(ctx: CanvasRenderingContext2D, w: number, h: number) {
   }
 }
 
-function drawSpineRig(ctx: CanvasRenderingContext2D, w: number, h: number, bones: RigPreviewBone[]) {
+function drawSpineRig(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  bones: RigPreviewBone[],
+  selectedBoneName: string | null,
+) {
   if (!bones.length) return
 
   const map = new Map(bones.map((b) => [b.name, b]))
@@ -179,17 +291,27 @@ function drawSpineRig(ctx: CanvasRenderingContext2D, w: number, h: number, bones
   }
 
   const jointR = Math.max(2, Math.min(6, 4 * Math.sqrt(4 / viewScale.value)))
-  ctx.fillStyle = '#0f6cbd'
+  const selR = jointR + 3
   for (const b of bones) {
     const s = worldToScreen(b.worldX, b.worldY, w, h)
+    const sel = selectedBoneName === b.name
+    ctx.fillStyle = sel ? '#c47d00' : '#0f6cbd'
     ctx.beginPath()
-    ctx.arc(s.x, s.y, jointR, 0, Math.PI * 2)
+    ctx.arc(s.x, s.y, sel ? selR : jointR, 0, Math.PI * 2)
     ctx.fill()
+    if (sel) {
+      ctx.strokeStyle = 'rgba(196, 125, 0, 0.9)'
+      ctx.lineWidth = 2
+      ctx.beginPath()
+      ctx.arc(s.x, s.y, selR + 2, 0, Math.PI * 2)
+      ctx.stroke()
+    }
   }
   ctx.restore()
 }
 
 function draw() {
+  if (live2dStore.showViewport) return
   const c = canvasRef.value
   if (!c) return
   const ctx = c.getContext('2d')
@@ -212,20 +334,41 @@ function draw() {
   const skLive = spineStore.ready && spineStore.bundle ? spineStore.bundle.skeleton : null
   const rigBones = skLive ? rigBonesFromSkeleton(skLive) : imp?.rigPreview?.bones
 
-  if (display.showSpineMesh && spineStore.ready && spineStore.bundle) {
+  const bundle = spineStore.bundle
+  const showSpineLayer =
+    spineStore.ready &&
+    bundle &&
+    (display.showSpineTexture || display.showSpineMeshWire || display.showSpineRegionWire)
+
+  if (showSpineLayer && bundle) {
     if (!skRenderer) skRenderer = new SkeletonRenderer(ctx)
-    skRenderer.triangleRendering = true
     skRenderer.debugRendering = Boolean(display.showSpineDebug)
     ctx.save()
     ctx.translate(w / 2, h / 2)
     ctx.scale(viewScale.value, viewScale.value)
     ctx.translate(-cameraCx.value, -cameraCy.value)
-    skRenderer.draw(spineStore.bundle.skeleton)
+    const sk = bundle.skeleton
+    if (display.showSpineTexture) {
+      drawSpineRegionAttachments(skRenderer, sk)
+    }
+    // MeshAttachment 的贴图属于「贴图」层；「贴图网格线」仅控制绿色线框可视性
+    if (display.showSpineTexture || display.showSpineMeshWire) {
+      drawSpineMeshAttachments(skRenderer, sk, {
+        drawTexture: Boolean(display.showSpineTexture),
+        drawWire: Boolean(display.showSpineMeshWire),
+      })
+    }
+    // 普通贴图（RegionAttachment）四边形边框线（与 Mesh 三角网格线分开开关）
+    if (display.showSpineRegionWire) {
+      drawSpineRegionWires(ctx, sk, { drawWire: true })
+    }
     ctx.restore()
   }
 
   if (display.showBones && rigBones?.length) {
-    drawSpineRig(ctx, w, h, rigBones)
+    const selBone =
+      hierarchySel.selected?.kind === 'bone' ? hierarchySel.selected.name : null
+    drawSpineRig(ctx, w, h, rigBones, selBone)
   }
 
   if (display.showHud) {
@@ -237,9 +380,12 @@ function draw() {
       lines.push(`格式: ${imp.formatId}`)
       if (imp.skeletonName) lines.push(`骨架: ${imp.skeletonName}`)
       if (imp.boneCount != null) lines.push(`骨骼数: ${imp.boneCount}`)
-      if (imp.formatId === 'spine-json' && !rigBones?.length) {
-        lines.push('（未生成骨骼线：见右侧「提示」）')
-      }
+    if (imp.formatId === 'spine-json' && !rigBones?.length) {
+      lines.push('（未生成骨骼线：见右侧「提示」）')
+    }
+    if (imp.formatId === 'live2d' && !live2dStore.ready) {
+      lines.push('（Live2D：单文件导入仅元数据；zip 导入可画布预览）')
+    }
     } else {
       lines.push('请通过「文件 → 导入…」加载 Spine / DragonBones / glTF')
     }
@@ -276,6 +422,36 @@ function onWheel(e: WheelEvent) {
 }
 
 function onPointerDown(e: PointerEvent) {
+  // 左键：点击选择对象（Spine slot）并同步左侧层次选择
+  if (e.button === 0) {
+    const c = canvasRef.value
+    if (!c) return
+    if (live2dStore.showViewport) return
+    if (!spineStore.ready || !spineStore.bundle) {
+      hierarchySel.clear()
+      draw()
+      return
+    }
+    const rect = c.getBoundingClientRect()
+    const sx = e.clientX - rect.left
+    const sy = e.clientY - rect.top
+    const { w, h } = getCanvasCssSize()
+    const p = screenToWorld(sx, sy, w, h)
+
+    const sk = spineStore.bundle.skeleton
+    try {
+      // 暂停时也确保 attachment vertices 是最新姿态
+      sk.updateWorldTransform(Physics.update)
+    } catch {
+      /* ignore */
+    }
+    const hit = pickTopmostSlotAtWorldPoint(sk, p.x, p.y)
+    if (hit) hierarchySel.select('slot', hit.data.name)
+    else hierarchySel.clear()
+    draw()
+    return
+  }
+
   if (e.button !== 1) return
   e.preventDefault()
   const c = canvasRef.value
@@ -377,9 +553,14 @@ watch(
 )
 
 watch(
-  () => display.showSpineMesh,
-  (v) => {
-    if (!v) display.showSpineDebug = false
+  () => live2dStore.showViewport,
+  () => draw(),
+)
+
+watch(
+  () => [display.showSpineTexture, display.showSpineMeshWire, display.showSpineRegionWire] as const,
+  ([tex, meshWire, regionWire]) => {
+    if (!tex && !meshWire && !regionWire) display.showSpineDebug = false
   },
 )
 </script>
@@ -390,15 +571,23 @@ watch(
       <span class="layer-bar-title">显示</span>
       <label class="layer-item">
         <input v-model="display.showGridLines" type="checkbox" />
-        网格线
+        坐标网格
       </label>
       <label class="layer-item">
         <input v-model="display.showWorldOrigin" type="checkbox" />
         世界原点
       </label>
       <label class="layer-item" :class="{ disabled: !spineStore.ready }">
-        <input v-model="display.showSpineMesh" type="checkbox" :disabled="!spineStore.ready" />
-        贴图 / 网格
+        <input v-model="display.showSpineTexture" type="checkbox" :disabled="!spineStore.ready" />
+        贴图
+      </label>
+      <label class="layer-item" :class="{ disabled: !spineStore.ready }">
+        <input v-model="display.showSpineMeshWire" type="checkbox" :disabled="!spineStore.ready" />
+        Mesh 网格线
+      </label>
+      <label class="layer-item" :class="{ disabled: !spineStore.ready }">
+        <input v-model="display.showSpineRegionWire" type="checkbox" :disabled="!spineStore.ready" />
+        Region 边框线
       </label>
       <label class="layer-item">
         <input v-model="display.showBones" type="checkbox" />
@@ -406,12 +595,21 @@ watch(
       </label>
       <label
         class="layer-item"
-        :class="{ disabled: !spineStore.ready || !display.showSpineMesh }"
+        :class="{
+          disabled:
+            !spineStore.ready ||
+            (!display.showSpineTexture && !display.showSpineMeshWire && !display.showSpineRegionWire),
+        }"
       >
         <input
           v-model="display.showSpineDebug"
           type="checkbox"
-          :disabled="!spineStore.ready || !display.showSpineMesh"
+          :disabled="
+            !spineStore.ready ||
+            (!display.showSpineTexture &&
+              !display.showSpineMeshWire &&
+              !display.showSpineRegionWire)
+          "
         />
         Spine 调试线
       </label>
@@ -420,7 +618,9 @@ watch(
         状态信息
       </label>
     </div>
+    <Live2DViewport v-if="live2dStore.showViewport" />
     <canvas
+      v-show="!live2dStore.showViewport"
       ref="canvasRef"
       class="canvas"
       @wheel.prevent="onWheel"

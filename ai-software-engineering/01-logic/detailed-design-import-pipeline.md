@@ -5,6 +5,7 @@
 1. 若扩展名为 `.gltf` / `.glb` → `gltf`。
 2. 若扩展名为 `.dbproj` → 按 DragonBones 工程解析（归一化 `armature` 等）。
 3. 若 MIME/文本为 JSON：尝试解析，检查键：
+   - `FileReferences` + `*.model3.json` 文件名或 `.moc3` 引用 → `live2d`（`parseLive2dModel3`）
    - `skeleton` + `bones`（Spine 风格）→ `spine-json`
    - 顶层 `armature`（DragonBones 运行时 JSON）→ `dragonbones`
    - 否则尝试 dbproj 归一化（`dragonBones` / `library` / `document` 等）→ `dragonbones`（`versionHint` 含 `dbproj`）

@@ -14,7 +14,8 @@
 
 - **文件 → 导入…**：可选单文件或多选。
   - **Spine 贴图 + 动画**：一次多选同一角色的 `*.json`（骨架）+ `*.atlas` + 图集中引用的贴图（如 `*.png`）；导入后画布显示角色，底部时间轴可选动画并播放/暂停。
-  - 其他：`.json`（仅 Spine 骨架或 DragonBones）、`.dbproj`（DragonBones 工程）、`.gltf` / `.glb`（摘要）。
+  - **Live2D Cubism**：导入 `*.model3.json`（UTF-8 JSON），可查看模型元数据与动作组名；完整画布渲染需后续接入 Cubism Web 运行时，不要单独只选 `.moc3`。
+  - 其他：`.json`（Spine / DragonBones）、`.dbproj`（DragonBones 工程）、`.gltf` / `.glb`（摘要）。
 - **帮助 → 支持的文件格式…**：查看各格式的说明、版本与兼容性注意（以对话框内文案为准）。
 - 导入成功后，右侧属性区与中央视口会显示骨架摘要信息；Spine 多文件包另显示运行时绘制。
 

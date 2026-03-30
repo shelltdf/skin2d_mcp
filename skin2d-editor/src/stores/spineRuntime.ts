@@ -6,12 +6,18 @@ import { disposeSpineBundle, loadSpineBundle } from '../spine/spineBundleLoader'
 import { useEditorStore } from './editor'
 
 export const useSpineRuntimeStore = defineStore('spineRuntime', () => {
+  /** 骨骼姿态更新计数，供属性面板等依赖刷新（骨架对象原地变更） */
+  const poseRevision = ref(0)
   const ready = ref(false)
   const playing = ref(false)
   const animationNames = ref<string[]>([])
   const currentAnimation = ref<string | null>(null)
   const bundle = shallowRef<LoadedSpineBundle | null>(null)
   const loadError = ref<string | null>(null)
+
+  function bumpPose() {
+    poseRevision.value++
+  }
 
   function dispose() {
     disposeSpineBundle(bundle.value)
@@ -21,6 +27,7 @@ export const useSpineRuntimeStore = defineStore('spineRuntime', () => {
     animationNames.value = []
     currentAnimation.value = null
     loadError.value = null
+    poseRevision.value = 0
   }
 
   /** 多选文件：skeleton.json + .atlas + 各页贴图 */
@@ -48,6 +55,7 @@ export const useSpineRuntimeStore = defineStore('spineRuntime', () => {
 
       ready.value = true
       playing.value = true
+      bumpPose()
 
       const editor = useEditorStore()
       const label = files.map((f) => f.name).join(', ')
@@ -67,6 +75,7 @@ export const useSpineRuntimeStore = defineStore('spineRuntime', () => {
     b.animationState.setAnimation(0, name, loop)
     b.animationState.apply(b.skeleton)
     b.skeleton.updateWorldTransform(Physics.update)
+    bumpPose()
   }
 
   function tick(delta: number) {
@@ -75,6 +84,7 @@ export const useSpineRuntimeStore = defineStore('spineRuntime', () => {
     b.animationState.update(delta)
     b.animationState.apply(b.skeleton)
     b.skeleton.updateWorldTransform(Physics.update)
+    bumpPose()
   }
 
   function togglePlay() {
@@ -82,6 +92,7 @@ export const useSpineRuntimeStore = defineStore('spineRuntime', () => {
   }
 
   return {
+    poseRevision,
     ready,
     playing,
     animationNames,
@@ -93,5 +104,6 @@ export const useSpineRuntimeStore = defineStore('spineRuntime', () => {
     setAnimation,
     tick,
     togglePlay,
+    bumpPose,
   }
 })
