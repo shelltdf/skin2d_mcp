@@ -21,6 +21,8 @@ const hierarchySelection = useHierarchySelectionStore()
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const formatsHelpOpen = ref(false)
 const canvasFullscreen = ref(false)
+const displayFullscreen = ref(false)
+const fullscreenEnabled = ref(false)
 
 function triggerImportPicker() {
   fileInputRef.value?.click()
@@ -28,6 +30,23 @@ function triggerImportPicker() {
 
 function toggleCanvasFullscreen() {
   canvasFullscreen.value = !canvasFullscreen.value
+}
+
+async function toggleDisplayFullscreen() {
+  if (!fullscreenEnabled.value) return
+  try {
+    if (!document.fullscreenElement) {
+      await document.documentElement.requestFullscreen()
+    } else {
+      await document.exitFullscreen()
+    }
+  } catch {
+    // ignore (permission / gesture restrictions)
+  }
+}
+
+function onFullscreenChange() {
+  displayFullscreen.value = Boolean(document.fullscreenElement)
 }
 
 function onKeydown(e: KeyboardEvent) {
@@ -87,8 +106,16 @@ async function onFiles(e: Event) {
   }
 }
 
-onMounted(() => document.addEventListener('keydown', onKeydown))
-onUnmounted(() => document.removeEventListener('keydown', onKeydown))
+onMounted(() => {
+  document.addEventListener('keydown', onKeydown)
+  document.addEventListener('fullscreenchange', onFullscreenChange)
+  fullscreenEnabled.value = Boolean(document.fullscreenEnabled)
+  onFullscreenChange()
+})
+onUnmounted(() => {
+  document.removeEventListener('keydown', onKeydown)
+  document.removeEventListener('fullscreenchange', onFullscreenChange)
+})
 </script>
 
 <template>
@@ -135,6 +162,14 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
       </div>
       <button type="button" class="tb-btn" @click="toggleCanvasFullscreen">
         {{ canvasFullscreen ? '退出全屏' : '画布全屏' }}
+      </button>
+      <button
+        type="button"
+        class="tb-btn"
+        :disabled="!fullscreenEnabled"
+        @click="toggleDisplayFullscreen"
+      >
+        {{ displayFullscreen ? '退出显示器全屏' : '显示器全屏' }}
       </button>
     </div>
 

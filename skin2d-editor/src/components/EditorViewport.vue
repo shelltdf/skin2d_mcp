@@ -146,6 +146,68 @@ function pickTopmostSlotAtWorldPoint(sk: Skeleton, wx: number, wy: number): Slot
   return null
 }
 
+function strokeWidthForHighlight(ctx: CanvasRenderingContext2D): number {
+  const sc = Math.abs(ctx.getTransform().a) || 1
+  return Math.max(1.3, 2.8 / sc)
+}
+
+function drawSelectedSlotHighlight(ctx: CanvasRenderingContext2D, sk: Skeleton) {
+  const sel = hierarchySel.selected
+  if (!sel || sel.kind !== 'slot') return
+  const slot = sk.findSlot(sel.name)
+  if (!slot) return
+  const att = slot.getAttachment()
+  if (!att) return
+
+  ctx.save()
+  ctx.globalAlpha = 1
+  ctx.strokeStyle = '#c47d00'
+  ctx.fillStyle = 'rgba(196, 125, 0, 0.18)'
+  ctx.lineJoin = 'round'
+  ctx.lineCap = 'round'
+  ctx.lineWidth = strokeWidthForHighlight(ctx)
+  ctx.shadowColor = 'rgba(0,0,0,0.25)'
+  ctx.shadowBlur = 8
+
+  if (att instanceof RegionAttachment) {
+    const quad = new Float32Array(8)
+    att.computeWorldVertices(slot, quad, 0, 2)
+    ctx.beginPath()
+    ctx.moveTo(quad[0], quad[1])
+    ctx.lineTo(quad[2], quad[3])
+    ctx.lineTo(quad[4], quad[5])
+    ctx.lineTo(quad[6], quad[7])
+    ctx.closePath()
+    ctx.fill()
+    ctx.stroke()
+    ctx.restore()
+    return
+  }
+
+  if (att instanceof MeshAttachment) {
+    const count = att.worldVerticesLength
+    const verts = new Float32Array(count)
+    att.computeWorldVertices(slot, 0, count, verts, 0, 2)
+    const tris = att.triangles
+    // 只描边三角轮廓（避免铺满整个网格导致太乱）
+    for (let t = 0; t < tris.length; t += 3) {
+      const i0 = tris[t] * 2
+      const i1 = tris[t + 1] * 2
+      const i2 = tris[t + 2] * 2
+      ctx.beginPath()
+      ctx.moveTo(verts[i0], verts[i0 + 1])
+      ctx.lineTo(verts[i1], verts[i1 + 1])
+      ctx.lineTo(verts[i2], verts[i2 + 1])
+      ctx.closePath()
+      ctx.stroke()
+    }
+    ctx.restore()
+    return
+  }
+
+  ctx.restore()
+}
+
 function rigBonesFromSkeleton(sk: Skeleton): RigPreviewBone[] {
   return sk.bones.map((b) => ({
     name: b.data.name,
@@ -362,6 +424,8 @@ function draw() {
     if (display.showSpineRegionWire) {
       drawSpineRegionWires(ctx, sk, { drawWire: true })
     }
+    // 选中高亮：画在贴图层之上、骨骼层之下
+    drawSelectedSlotHighlight(ctx, sk)
     ctx.restore()
   }
 
