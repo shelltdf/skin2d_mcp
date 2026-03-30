@@ -5,16 +5,17 @@ const emit = defineEmits<{
   import: []
   newProject: []
   open: []
+  formatsHelp: []
 }>()
 
-const fileOpen = ref(false)
+const activeMenu = ref<'file' | 'help' | null>(null)
 
-function toggleFile() {
-  fileOpen.value = !fileOpen.value
+function toggleMenu(which: 'file' | 'help') {
+  activeMenu.value = activeMenu.value === which ? null : which
 }
 
 function closeMenus() {
-  fileOpen.value = false
+  activeMenu.value = null
 }
 
 function onImport() {
@@ -31,6 +32,11 @@ function onOpen() {
   closeMenus()
   emit('open')
 }
+
+function onFormatsHelp() {
+  closeMenus()
+  emit('formatsHelp')
+}
 </script>
 
 <template>
@@ -41,8 +47,8 @@ function onOpen() {
     </div>
     <nav class="menubar" @mouseleave="closeMenus">
       <div class="menu-wrap">
-        <button type="button" class="menu-top" @click="toggleFile">文件</button>
-        <div v-if="fileOpen" class="dropdown">
+        <button type="button" class="menu-top" @click="toggleMenu('file')">文件</button>
+        <div v-if="activeMenu === 'file'" class="dropdown">
           <button type="button" class="menu-item" @click="onNew">新建工程</button>
           <button type="button" class="menu-item" @click="onOpen">打开…</button>
           <div class="sep" />
@@ -51,7 +57,14 @@ function onOpen() {
       </div>
       <button type="button" class="menu-top" disabled title="即将推出">编辑</button>
       <button type="button" class="menu-top" disabled title="即将推出">视图</button>
-      <button type="button" class="menu-top" disabled title="即将推出">帮助</button>
+      <div class="menu-wrap">
+        <button type="button" class="menu-top" @click="toggleMenu('help')">帮助</button>
+        <div v-if="activeMenu === 'help'" class="dropdown dropdown-help">
+          <button type="button" class="menu-item accent" @click="onFormatsHelp">
+            支持的文件格式…
+          </button>
+        </div>
+      </div>
     </nav>
     <div class="window-btns" aria-hidden="true">
       <span class="win-btn min" />
@@ -134,6 +147,10 @@ function onOpen() {
   border-radius: var(--win-radius-sm);
   box-shadow: var(--win-shadow);
   z-index: 100;
+}
+
+.dropdown-help {
+  min-width: 220px;
 }
 
 .menu-item {

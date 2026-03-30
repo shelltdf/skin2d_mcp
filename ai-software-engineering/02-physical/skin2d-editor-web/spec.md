@@ -10,7 +10,7 @@
 ### 导入
 
 - 菜单 **文件 → 导入…** 与工具条「导入」等价：触发本地文件选择。
-- 支持扩展名：`.json`、`.gltf`、`.glb`。
+- 支持扩展名：`.json`、`.gltf`、`.glb`、`.dbproj`（DragonBones 工程，须为 UTF-8 JSON）。
 - 解析成功后，**属性**区与 **视口** 显示 `ImportResult` 摘要（见下）。
 
 ### ImportResult 字段（单一事实来源）

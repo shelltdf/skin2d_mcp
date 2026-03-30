@@ -1,8 +1,9 @@
 import type { ImportResult } from './types'
 import { emptyResult } from './types'
+import { parseDbprojText, tryParseDbprojObject } from './dbproj'
 import { parseDragonBonesJson } from './dragonbones'
 import { parseGltfFile } from './gltf'
-import { parseSpineJson } from './spine'
+import { parseSpineJsonString } from './spine'
 
 function tryParseJson(text: string): unknown {
   return JSON.parse(text) as unknown
@@ -41,15 +42,24 @@ export async function importAssetFile(file: File): Promise<ImportResult> {
     return emptyResult([`JSON 解析失败：${e instanceof Error ? e.message : String(e)}`])
   }
 
+  if (lower.endsWith('.dbproj')) {
+    return parseDbprojText(text, file.name)
+  }
+
   if (isSpineLike(obj)) {
-    return parseSpineJson(obj, file.name)
+    return parseSpineJsonString(text, file.name)
   }
   if (isDragonBonesLike(obj)) {
     return parseDragonBonesJson(obj, file.name)
   }
 
+  const dbproj = tryParseDbprojObject(obj, file.name)
+  if (dbproj) {
+    return dbproj
+  }
+
   return emptyResult([
-    `无法识别 JSON 骨架格式（非 Spine / DragonBones 特征）。文件：${file.name}`,
+    `无法识别 JSON 骨架格式（非 Spine / DragonBones / dbproj 特征）。文件：${file.name}`,
   ])
 }
 

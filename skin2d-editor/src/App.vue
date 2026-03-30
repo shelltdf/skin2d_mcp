@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import AppMenuBar from './components/AppMenuBar.vue'
+import FormatsHelpDialog from './components/FormatsHelpDialog.vue'
 import EditorViewport from './components/EditorViewport.vue'
 import HierarchyPanel from './components/HierarchyPanel.vue'
 import PropertyPanel from './components/PropertyPanel.vue'
@@ -10,6 +11,7 @@ import { useEditorStore } from './stores/editor'
 
 const store = useEditorStore()
 const fileInputRef = ref<HTMLInputElement | null>(null)
+const formatsHelpOpen = ref(false)
 
 function triggerImportPicker() {
   fileInputRef.value?.click()
@@ -36,7 +38,7 @@ async function onFiles(e: Event) {
       ref="fileInputRef"
       type="file"
       class="hidden"
-      accept=".json,.gltf,.glb,application/json"
+      accept=".json,.gltf,.glb,.dbproj,application/json"
       @change="onFiles"
     />
 
@@ -44,11 +46,14 @@ async function onFiles(e: Event) {
       @import="triggerImportPicker"
       @new-project="() => store.setImportResult(null, null, null)"
       @open="triggerImportPicker"
+      @formats-help="formatsHelpOpen = true"
     />
+
+    <FormatsHelpDialog :open="formatsHelpOpen" @close="formatsHelpOpen = false" />
 
     <div class="toolbar">
       <button type="button" class="tb-btn primary" @click="triggerImportPicker">导入</button>
-      <span class="tb-hint">支持 Spine JSON、DragonBones、glTF 2.0（.gltf / .glb）</span>
+      <span class="tb-hint">支持 Spine JSON、DragonBones（含 .dbproj 工程）、glTF 2.0</span>
     </div>
 
     <div class="main-row">

@@ -23,7 +23,8 @@ interface ImportResult {
 | 格式 | 典型文件 | 说明 |
 |------|----------|------|
 | Spine JSON | `*.json`（skeleton） | 社区广泛使用；JSON 导出 |
-| DragonBones | `*_ske.json`、`*_tex.json` | 开源 DragonBones 数据 |
+| DragonBones | `*_ske.json`、`*_tex.json` | 开源 DragonBones 运行时数据 |
+| DragonBones 工程 | `*.dbproj` | DragonBonesPro / LoongBones 工程 JSON；骨架可能在 `armature` / `dragonBones` / `library` 等节点；不含贴图 |
 | glTF 2.0 | `*.gltf` / `*.glb` | Khronos 开放标准；2D 内容可嵌于扩展或平面网格 |
 
 GUI 操作（菜单、快捷键）不属于本文件，见 `product-design.md` 与逻辑层详细设计。
