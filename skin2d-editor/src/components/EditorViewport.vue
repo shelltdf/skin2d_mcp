@@ -5,9 +5,11 @@ import { onMounted, onUnmounted, ref, watch } from 'vue'
 import type { RigPreviewBone } from '../importers/types'
 import { useEditorStore } from '../stores/editor'
 import { useSpineRuntimeStore } from '../stores/spineRuntime'
+import { useViewportDisplayStore } from '../stores/viewportDisplay'
 
 const store = useEditorStore()
 const spineStore = useSpineRuntimeStore()
+const display = useViewportDisplayStore()
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 let skRenderer: SkeletonRenderer | null = null
 
@@ -115,39 +117,43 @@ function drawWorldGrid(ctx: CanvasRenderingContext2D, w: number, h: number) {
     Math.abs(b * sc - targetPx) < Math.abs(a * sc - targetPx) ? b : a,
   )
 
-  ctx.strokeStyle = 'rgba(0,0,0,0.07)'
-  ctx.lineWidth = 1
-  let x0 = Math.floor(left / step) * step
-  for (let wx = x0; wx <= right; wx += step) {
-    const sx = w / 2 + (wx - cx) * sc
-    ctx.beginPath()
-    ctx.moveTo(sx + 0.5, 0)
-    ctx.lineTo(sx + 0.5, h)
-    ctx.stroke()
-  }
-  let y0 = Math.floor(top / step) * step
-  for (let wy = y0; wy <= bottom; wy += step) {
-    const sy = h / 2 + (wy - cy) * sc
-    ctx.beginPath()
-    ctx.moveTo(0, sy + 0.5)
-    ctx.lineTo(w, sy + 0.5)
-    ctx.stroke()
+  if (display.showGridLines) {
+    ctx.strokeStyle = 'rgba(0,0,0,0.07)'
+    ctx.lineWidth = 1
+    let x0 = Math.floor(left / step) * step
+    for (let wx = x0; wx <= right; wx += step) {
+      const sx = w / 2 + (wx - cx) * sc
+      ctx.beginPath()
+      ctx.moveTo(sx + 0.5, 0)
+      ctx.lineTo(sx + 0.5, h)
+      ctx.stroke()
+    }
+    let y0 = Math.floor(top / step) * step
+    for (let wy = y0; wy <= bottom; wy += step) {
+      const sy = h / 2 + (wy - cy) * sc
+      ctx.beginPath()
+      ctx.moveTo(0, sy + 0.5)
+      ctx.lineTo(w, sy + 0.5)
+      ctx.stroke()
+    }
   }
 
-  ctx.strokeStyle = 'rgba(0, 103, 192, 0.28)'
-  ctx.lineWidth = 1.5
-  const o0 = worldToScreen(0, 0, w, h)
-  if (o0.x >= 0 && o0.x <= w) {
-    ctx.beginPath()
-    ctx.moveTo(o0.x, 0)
-    ctx.lineTo(o0.x, h)
-    ctx.stroke()
-  }
-  if (o0.y >= 0 && o0.y <= h) {
-    ctx.beginPath()
-    ctx.moveTo(0, o0.y)
-    ctx.lineTo(w, o0.y)
-    ctx.stroke()
+  if (display.showWorldOrigin) {
+    ctx.strokeStyle = 'rgba(0, 103, 192, 0.28)'
+    ctx.lineWidth = 1.5
+    const o0 = worldToScreen(0, 0, w, h)
+    if (o0.x >= 0 && o0.x <= w) {
+      ctx.beginPath()
+      ctx.moveTo(o0.x, 0)
+      ctx.lineTo(o0.x, h)
+      ctx.stroke()
+    }
+    if (o0.y >= 0 && o0.y <= h) {
+      ctx.beginPath()
+      ctx.moveTo(0, o0.y)
+      ctx.lineTo(w, o0.y)
+      ctx.stroke()
+    }
   }
 }
 
@@ -198,15 +204,18 @@ function draw() {
   ctx.fillStyle = '#ececec'
   ctx.fillRect(0, 0, w, h)
 
-  drawWorldGrid(ctx, w, h)
+  if (display.showGridLines || display.showWorldOrigin) {
+    drawWorldGrid(ctx, w, h)
+  }
 
   const imp = store.lastImport
   const skLive = spineStore.ready && spineStore.bundle ? spineStore.bundle.skeleton : null
   const rigBones = skLive ? rigBonesFromSkeleton(skLive) : imp?.rigPreview?.bones
 
-  if (spineStore.ready && spineStore.bundle) {
+  if (display.showSpineMesh && spineStore.ready && spineStore.bundle) {
     if (!skRenderer) skRenderer = new SkeletonRenderer(ctx)
     skRenderer.triangleRendering = true
+    skRenderer.debugRendering = Boolean(display.showSpineDebug)
     ctx.save()
     ctx.translate(w / 2, h / 2)
     ctx.scale(viewScale.value, viewScale.value)
@@ -215,32 +224,34 @@ function draw() {
     ctx.restore()
   }
 
-  if (rigBones?.length) {
+  if (display.showBones && rigBones?.length) {
     drawSpineRig(ctx, w, h, rigBones)
   }
 
-  ctx.fillStyle = '#1a1a1a'
-  ctx.font = '12px Segoe UI, sans-serif'
-  const lines: string[] = ['Skin2D 视口']
-  if (store.lastFileName) lines.push(`文件: ${store.lastFileName}`)
-  if (imp) {
-    lines.push(`格式: ${imp.formatId}`)
-    if (imp.skeletonName) lines.push(`骨架: ${imp.skeletonName}`)
-    if (imp.boneCount != null) lines.push(`骨骼数: ${imp.boneCount}`)
-    if (imp.formatId === 'spine-json' && !rigBones?.length) {
-      lines.push('（未生成骨骼线：见右侧「提示」）')
+  if (display.showHud) {
+    ctx.fillStyle = '#1a1a1a'
+    ctx.font = '12px Segoe UI, sans-serif'
+    const lines: string[] = ['Skin2D 视口']
+    if (store.lastFileName) lines.push(`文件: ${store.lastFileName}`)
+    if (imp) {
+      lines.push(`格式: ${imp.formatId}`)
+      if (imp.skeletonName) lines.push(`骨架: ${imp.skeletonName}`)
+      if (imp.boneCount != null) lines.push(`骨骼数: ${imp.boneCount}`)
+      if (imp.formatId === 'spine-json' && !rigBones?.length) {
+        lines.push('（未生成骨骼线：见右侧「提示」）')
+      }
+    } else {
+      lines.push('请通过「文件 → 导入…」加载 Spine / DragonBones / glTF')
     }
-  } else {
-    lines.push('请通过「文件 → 导入…」加载 Spine / DragonBones / glTF')
+    if (spineStore.ready) {
+      lines.push(spineStore.playing ? '动画：播放中' : '动画：已暂停')
+    }
+    const z = baseFitScale.value > 0 ? viewScale.value / baseFitScale.value : 1
+    lines.push(`缩放 ×${z.toFixed(2)} · 中键拖移 · 滚轮缩放 · 双击复位`)
+    lines.forEach((line, i) => {
+      ctx.fillText(line, 16, 24 + i * 18)
+    })
   }
-  if (spineStore.ready) {
-    lines.push(spineStore.playing ? '动画：播放中' : '动画：已暂停')
-  }
-  const z = baseFitScale.value > 0 ? viewScale.value / baseFitScale.value : 1
-  lines.push(`缩放 ×${z.toFixed(2)} · 中键拖移 · 滚轮缩放 · 双击复位`)
-  lines.forEach((line, i) => {
-    ctx.fillText(line, 16, 24 + i * 18)
-  })
 }
 
 function onWheel(e: WheelEvent) {
@@ -364,10 +375,51 @@ watch(
     }
   },
 )
+
+watch(
+  () => display.showSpineMesh,
+  (v) => {
+    if (!v) display.showSpineDebug = false
+  },
+)
 </script>
 
 <template>
   <div class="viewport-wrap">
+    <div class="layer-bar" @pointerdown.stop @wheel.stop>
+      <span class="layer-bar-title">显示</span>
+      <label class="layer-item">
+        <input v-model="display.showGridLines" type="checkbox" />
+        网格线
+      </label>
+      <label class="layer-item">
+        <input v-model="display.showWorldOrigin" type="checkbox" />
+        世界原点
+      </label>
+      <label class="layer-item" :class="{ disabled: !spineStore.ready }">
+        <input v-model="display.showSpineMesh" type="checkbox" :disabled="!spineStore.ready" />
+        贴图 / 网格
+      </label>
+      <label class="layer-item">
+        <input v-model="display.showBones" type="checkbox" />
+        骨骼
+      </label>
+      <label
+        class="layer-item"
+        :class="{ disabled: !spineStore.ready || !display.showSpineMesh }"
+      >
+        <input
+          v-model="display.showSpineDebug"
+          type="checkbox"
+          :disabled="!spineStore.ready || !display.showSpineMesh"
+        />
+        Spine 调试线
+      </label>
+      <label class="layer-item">
+        <input v-model="display.showHud" type="checkbox" />
+        状态信息
+      </label>
+    </div>
     <canvas
       ref="canvasRef"
       class="canvas"
@@ -388,6 +440,51 @@ watch(
   min-height: 0;
   background: var(--win-surface);
   position: relative;
+}
+
+.layer-bar {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  max-width: min(420px, calc(100% - 16px));
+  padding: 6px 10px;
+  border: 1px solid var(--win-border);
+  border-radius: var(--win-radius-sm);
+  background: color-mix(in srgb, var(--win-surface) 92%, transparent);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  font-size: 12px;
+  color: var(--win-text);
+  pointer-events: auto;
+}
+
+.layer-bar-title {
+  font-weight: 600;
+  color: var(--win-text-secondary);
+  margin-right: 4px;
+}
+
+.layer-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.layer-item.disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.layer-item input {
+  accent-color: var(--win-accent);
 }
 
 .canvas {

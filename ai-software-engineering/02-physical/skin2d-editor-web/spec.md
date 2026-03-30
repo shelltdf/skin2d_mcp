@@ -39,6 +39,11 @@
 2. 探测格式 → Spine 多文件为完整运行时；其余为轻量解析（glTF 摘要、DragonBones/dbproj 元数据等）。
 3. 状态写入 Pinia（`editor` + 可选 `spineRuntime`）→ 视口 `requestAnimationFrame` 循环中若 `spineRuntime.playing` 则 `tick`，并 `SkeletonRenderer.draw` 与骨骼线叠加。
 
+## 视口显示层
+
+- 用户可通过视口右上角「显示」条切换：网格线、世界原点、Spine 贴图/网格、骨骼叠加、Spine 调试线（依赖贴图层）、左上角状态信息。
+- 状态持久于会话内 Pinia `viewportDisplay`；新建工程恢复默认全开（调试线关）。
+
 ## 技术约束
 
 - 路径与文件名 ASCII；文本 UTF-8。

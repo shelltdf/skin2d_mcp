@@ -9,9 +9,11 @@ import TimelinePanel from './components/TimelinePanel.vue'
 import { importAssetFile } from './importers'
 import { useEditorStore } from './stores/editor'
 import { useSpineRuntimeStore } from './stores/spineRuntime'
+import { useViewportDisplayStore } from './stores/viewportDisplay'
 
 const store = useEditorStore()
 const spineStore = useSpineRuntimeStore()
+const viewportDisplay = useViewportDisplayStore()
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const formatsHelpOpen = ref(false)
 
@@ -21,6 +23,7 @@ function triggerImportPicker() {
 
 function onNewProject() {
   spineStore.dispose()
+  viewportDisplay.resetToDefaults()
   store.setImportResult(null, null, null)
 }
 

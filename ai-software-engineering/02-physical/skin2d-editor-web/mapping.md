@@ -13,5 +13,6 @@
 | dbproj 工程归一化 / 导入 | `skin2d-editor/src/importers/dbproj.ts` |
 | glTF 摘要 | `skin2d-editor/src/importers/gltf.ts` |
 | 状态 | `skin2d-editor/src/stores/editor.ts` |
+| 视口显示层开关 | `skin2d-editor/src/stores/viewportDisplay.ts` |
 | 视口画布 | `skin2d-editor/src/components/EditorViewport.vue` |
 | 时间轴（Spine 动画选择） | `skin2d-editor/src/components/TimelinePanel.vue` |
