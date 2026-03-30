@@ -1,0 +1,46 @@
+/* Windows 11 浅色 Fluent 风格令牌（浏览器内模拟） */
+:root {
+  --win-bg: #f3f3f3;
+  --win-surface: #ffffff;
+  --win-surface-alt: #fafafa;
+  --win-border: #e5e5e5;
+  --win-border-strong: #d1d1d1;
+  --win-text: #1a1a1a;
+  --win-text-secondary: #5c5c5c;
+  --win-accent: #0067c0;
+  --win-accent-hover: #005a9e;
+  --win-titlebar: #f3f3f3;
+  --win-titlebar-border: #e0e0e0;
+  --win-radius: 8px;
+  --win-radius-sm: 4px;
+  --win-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --win-font: 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
+  --win-mono: 'Cascadia Code', Consolas, ui-monospace, monospace;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  font-family: var(--win-font);
+  font-size: 14px;
+  color: var(--win-text);
+  background: var(--win-bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+#app {
+  height: 100%;
+  min-height: 100vh;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
