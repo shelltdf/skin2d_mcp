@@ -1,10 +1,9 @@
 import type { ImportResult } from './types'
 import { emptyResult } from './types'
 import { assertTextLooksLikeJson, rejectKnownNonJsonFile } from './importGuards'
-import { parseDbprojText, tryParseDbprojObject } from './dbproj'
 import { parseDragonBonesJson } from './dragonbones'
 import { parseGltfFile } from './gltf'
-import { isLive2dModel3Json, parseLive2dModel3 } from './live2d'
+import { isLive2dModel3Json } from './live2d'
 import { parseSpineJsonString } from './spine'
 import { useUiSettingsStore } from '../stores/uiSettings'
 
@@ -46,11 +45,6 @@ export async function importAssetFile(file: File): Promise<ImportResult> {
     ])
   }
 
-  // dbproj: allow parser to handle non-standard prefixes/BOM/whitespace without the generic JSON shape guard
-  if (lower.endsWith('.dbproj')) {
-    return parseDbprojText(text, file.name)
-  }
-
   const shapeHint = assertTextLooksLikeJson(text, file.name)
   if (shapeHint) {
     return emptyResult([shapeHint])
@@ -62,14 +56,19 @@ export async function importAssetFile(file: File): Promise<ImportResult> {
   } catch {
     return emptyResult([
       t(
-        `「${file.name}」无法解析为合法 JSON。请确认文件为 UTF-8 编码的 Spine / DragonBones / Live2D / dbproj 文本导出，且未被截断或混入二进制数据。`,
-        `“${file.name}” is not valid JSON. Ensure it is a UTF-8 text export from Spine/DragonBones/Live2D/dbproj and not truncated or mixed with binary data.`,
+        `「${file.name}」无法解析为合法 JSON。请确认文件为 UTF-8 编码的 Spine / DragonBones / Live2D 文本导出，且未被截断或混入二进制数据。`,
+        `“${file.name}” is not valid JSON. Ensure it is a UTF-8 text export from Spine/DragonBones/Live2D and not truncated or mixed with binary data.`,
       ),
     ])
   }
 
   if (isLive2dModel3Json(obj, file.name)) {
-    return parseLive2dModel3(obj, file.name)
+    return emptyResult([
+      t(
+        `Live2D 仅支持导入 **单个 .zip**（内含 *.model3.json、.moc3、贴图等）。请勿单独打开 *.model3.json。`,
+        'Live2D only supports a single **.zip** (containing *.model3.json, .moc3, textures, etc.). Do not open *.model3.json alone.',
+      ),
+    ])
   }
 
   if (isSpineLike(obj)) {
@@ -79,15 +78,10 @@ export async function importAssetFile(file: File): Promise<ImportResult> {
     return parseDragonBonesJson(obj, file.name)
   }
 
-  const dbproj = tryParseDbprojObject(obj, file.name)
-  if (dbproj) {
-    return dbproj
-  }
-
   return emptyResult([
     t(
-      `无法识别 JSON 骨架格式（非 Spine / DragonBones / Live2D model3 / dbproj 特征）。文件：${file.name}`,
-      `Unrecognized JSON rig format (not Spine/DragonBones/Live2D model3/dbproj). File: ${file.name}`,
+      `无法识别 JSON 骨架格式（非 Spine / DragonBones 特征）。文件：${file.name}`,
+      `Unrecognized JSON rig format (not Spine/DragonBones). File: ${file.name}`,
     ),
   ])
 }

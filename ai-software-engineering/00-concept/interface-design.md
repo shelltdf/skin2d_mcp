@@ -30,9 +30,8 @@ interface ImportResult {
 | 格式 | 典型文件 | 说明 |
 |------|----------|------|
 | Spine JSON | `*.json`（skeleton） | 社区广泛使用；JSON 导出 |
-| DragonBones | `*_ske.json`、`*_tex.json` | 开源 DragonBones 运行时数据；导入以 JSON **结构**（顶层 `armature` 数组）为准，**文件名**不限于 `*_ske.json` |
-| DragonBones 工程 | `*.dbproj` | 常为二进制或 ZIP；仅文本 JSON 工程可尝试解析；推荐运行时骨架 `*_ske.json`；骨架可能在 `armature` / `dragonBones` / `library`；不含贴图 |
-| Live2D Cubism（Web 预览） | 单文件 `*.zip` | 内含 `*.model3.json`、`.moc3`、贴图；实现侧用 `jszip` 实现 `pixi-live2d-display` 的 `ZipLoader`；`index.html` 须加载 Cubism Core |
+| DragonBones | `*_ske.json`、`*_tex.json` | 开源 DragonBones 运行时数据；导入以 JSON **结构**（顶层 `armature` 数组）为准，**文件名**不限于 `*_ske.json`；**不支持** `.dbproj` 工程文件，须先导出运行时骨架 JSON |
+| Live2D Cubism（Web 预览） | 单文件 `*.zip` | 内含 `*.model3.json`、`.moc3`、贴图；实现侧用 `jszip` 注册 `pixi-live2d-display` 的 `ZipLoader`；`index.html` 须加载 Cubism Core；**不**支持多文件多选（资源常跨目录） |
 | glTF 2.0 | `*.gltf` / `*.glb` | Khronos 开放标准；2D 内容可嵌于扩展或平面网格 |
 
 GUI 操作（菜单、快捷键）不属于本文件，见 `product-design.md` 与逻辑层详细设计。

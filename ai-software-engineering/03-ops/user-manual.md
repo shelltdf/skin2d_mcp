@@ -14,9 +14,9 @@
 
 - **文件 → 导入…**：可选单文件或多选。
   - **Spine 贴图 + 动画**：一次多选同一角色的 `*.json`（骨架）+ `*.atlas` + 图集中引用的贴图（如 `*.png`）；导入后画布显示角色，底部时间轴可选动画并播放/暂停。
-  - **Live2D Cubism（画布预览）**：将模型目录打成 **单个 `*.zip`**（含 `*.model3.json` / `.moc3` / 贴图等），导入时只选这一份 zip，即可在画布区预览。预览区内：**中键**拖动画布平移，**滚轮**缩放，**双击**复位视图；**左键**可与模型交互（视线/命中区等，依 `pixi-live2d-display` 默认行为）。若 zip 导入报错「Not implemented」，需使用已集成 **JSZip 注册 ZipLoader** 的构建版本。
-  - **Live2D Cubism（仅元数据）**：导入 `*.model3.json`（UTF-8 JSON）可查看模型元数据与动作组名，但不会渲染 Live2D 画布；不要单独只选 `.moc3`。
-  - 其他：`.json`（Spine / DragonBones `*_ske.json` 等）、`.dbproj`（仅文本 JSON 工程；多数为二进制时请改导 `*_ske.json`）、`.gltf` / `.glb`（摘要）。
+  - **Live2D Cubism**：仅支持 **单个 `*.zip`**（含 `*.model3.json` / `.moc3` / 贴图等），导入时只选这一份 zip，即可在画布区预览；单独打开 `*.model3.json` 会提示改为使用 zip。若 zip 导入报错「Not implemented」，需使用已集成 **JSZip 注册 ZipLoader** 的构建版本。不要单独只选 `.moc3`。
+  - **Live2D 预览区内操作**：**中键**平移视口，**滚轮**缩放，**双击**复位；**左键**与模型交互（视线/命中区等，依 `pixi-live2d-display`）。
+  - 其他：`.json`（Spine / DragonBones `*_ske.json` 等；**不支持** `.dbproj` 工程文件）、`.gltf` / `.glb`（摘要）。
 - **帮助 → 支持的文件格式…**：查看各格式的说明、版本与兼容性注意（以对话框内文案为准）。
 - 导入成功后，右侧属性区与中央视口会显示骨架摘要信息；Spine 多文件包另显示运行时绘制。
 - **时间轴（Timeline）**：可播放/暂停、拖动进度条寻帧；Tab 切换 **摄影表**（中文）/ **Dope Sheet**（英文界面）与 **曲线**（只读）。

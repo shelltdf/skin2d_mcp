@@ -141,10 +141,9 @@ onUnmounted(() => {
 
           <section>
             <h3>
-              Live2D Cubism（<code>*.model3.json</code> / <code>*.zip</code>）
+              Live2D Cubism（<code>*.zip</code>）
               <span class="badges-row" :aria-label="t('导入方式', 'Import modes')">
                 <span class="badge badge-zip">{{ t('单 zip：画布预览', 'Zip: canvas preview') }}</span>
-                <span class="badge badge-single">{{ t('单文件 model3：仅元数据', 'Single model3: metadata only') }}</span>
                 <span class="badge badge-nodir">{{ t('非目录（可 zip 打包）', 'No folder (zip allowed)') }}</span>
               </span>
             </h3>
@@ -152,34 +151,25 @@ onUnmounted(() => {
               <li>
                 <strong>{{ t('内容', 'Content') }}</strong>：{{
                   t(
-                    'Cubism Editor 导出的模型描述 JSON，根节点含 FileReferences，引用 .moc3、贴图、物理、姿势与 Motions 等。',
-                    'A Cubism Editor exported model JSON. Root includes FileReferences referencing .moc3, textures, physics, pose and Motions, etc.',
+                    'zip 内需含 Cubism 导出的 *.model3.json（根节点含 FileReferences，引用 .moc3、贴图、物理、姿势与 Motions 等）及关联资源。',
+                    'The zip must contain the Cubism-exported *.model3.json (root includes FileReferences for .moc3, textures, physics, pose, Motions, etc.) and related assets.',
                   )
                 }}
               </li>
               <li>
-                <strong>{{ t('画布预览', 'Canvas preview') }}</strong>（<span class="badge badge-zip">{{ t('单 zip', 'Zip') }}</span>）：
+                <strong>{{ t('画布预览', 'Canvas preview') }}</strong>：
                 {{
                   t(
-                    '将模型目录内所需文件（含 *.model3.json、.moc3、贴图等）打成一个 .zip，导入时只选该 zip 这一份文件（不要与别的格式多选混在一起）。',
-                    'Zip the required files (including *.model3.json, .moc3, textures, etc.) into a single .zip. Import by selecting only that zip (do not multi-select with other formats).',
-                  )
-                }}
-              </li>
-              <li>
-                <strong>{{ t('仅元数据', 'Metadata only') }}</strong>（<span class="badge badge-single">{{ t('单文件', 'Single') }}</span>）：
-                {{
-                  t(
-                    '只导入 *.model3.json 时，可解析版本、贴图数量、动作组名等并在面板展示，但不会在画布上渲染 Live2D 模型。',
-                    'Importing only *.model3.json shows metadata (version, texture count, motion groups, etc.) in panels, but does not render the Live2D model on canvas.',
+                    '将模型目录内所需文件打成**单个** .zip，导入时只选该 zip（不要与别的格式多选混在一起）。不支持单独打开 *.model3.json。',
+                    'Zip all required files into a **single** .zip and import only that file (do not multi-select with other formats). Opening *.model3.json alone is not supported.',
                   )
                 }}
               </li>
               <li>
                 <strong>{{ t('注意', 'Note') }}</strong>：{{
                   t(
-                    '单独只选 .moc3 / .moc 会提示改为导入 *.model3.json 或使用整包 zip；请遵守 Live2D 公开样本与 SDK 许可。',
-                    'Importing .moc3/.moc alone will prompt you to import *.model3.json or use a full zip package. Please follow Live2D sample and SDK licensing.',
+                    '单独只选 .moc3 / .moc 会提示改为使用整包 zip；请遵守 Live2D 公开样本与 SDK 许可。',
+                    'Importing .moc3/.moc alone will prompt you to use a full zip package. Please follow Live2D sample and SDK licensing.',
                   )
                 }}
               </li>
@@ -203,35 +193,6 @@ onUnmounted(() => {
                   t(
                     '*_tex.json / 图集需与工程配套；本工具导入骨架 JSON 时不自动加载贴图，也不支持在同一次导入里附带多选贴图（仅解析该 ske JSON）。',
                     'Texture atlas (*_tex.json) must match the project. This tool does not auto-load textures when importing the skeleton JSON, and does not support multi-selecting textures together (it parses only the ske JSON).',
-                  )
-                }}
-              </li>
-            </ul>
-          </section>
-
-          <section>
-            <h3>
-              {{ t('DragonBones 工程', 'DragonBones project') }}（<code>*.dbproj</code>）
-              <span class="badges-row" :aria-label="t('导入方式', 'Import modes')">
-                <span class="badge badge-single">{{ t('单文件', 'Single') }}</span>
-                <span class="badge badge-nodir">{{ t('非目录', 'No folder') }}</span>
-              </span>
-            </h3>
-            <ul>
-              <li>
-                <strong>{{ t('内容', 'Content') }}</strong>：{{
-                  t(
-                    'DragonBonesPro、LoongBones 等的工程文件。常见为二进制或 ZIP 封装，浏览器内无法用 JSON 打开；部分旧版/导出可能是 UTF-8 文本 JSON，骨架可能在 armature、dragonBones、library 等节点，导入时会尝试归一化。',
-                    'Project files from DragonBonesPro/LoongBones are often binary or ZIP-wrapped and cannot be treated as JSON in the browser; some exports may be UTF-8 text JSON with rigs under armature/dragonBones/library—import normalizes when possible.',
-                  )
-                }}
-              </li>
-              <li><strong>{{ t('版本 / 兼容', 'Version / compatibility') }}</strong>：{{ t('不同编辑器版本、不同厂商（龙骨 / LoongBones）工程结构可能不同；升级编辑器后工程内层字段可能变化。', 'Different editor versions/vendors may use different structures; fields can change after upgrades.') }}</li>
-              <li>
-                <strong>{{ t('注意', 'Note') }}</strong>：{{
-                  t(
-                    '推荐直接导出并导入 *_ske.json（运行时骨架）。不包含贴图；二进制 .dbproj 无法解析。若文本型仍无法识别，请核对编辑器版本或提供可复现的 JSON 结构（脱敏）。',
-                    'Prefer exporting and importing *_ske.json (runtime skeleton). No textures embedded; binary .dbproj cannot be parsed. If text export still fails, verify editor version or share a reproducible (sanitized) JSON.',
                   )
                 }}
               </li>

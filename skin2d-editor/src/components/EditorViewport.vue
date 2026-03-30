@@ -454,7 +454,7 @@ function draw() {
       lines.push('（未生成骨骼线：见右侧「提示」）')
     }
     if (imp.formatId === 'live2d' && !live2dStore.ready) {
-      lines.push('（Live2D：单文件导入仅元数据；zip 导入可画布预览）')
+      lines.push('（Live2D：正在加载画布预览…）')
     }
     } else {
       lines.push('请通过「文件 → 导入…」加载 Spine / DragonBones / glTF')

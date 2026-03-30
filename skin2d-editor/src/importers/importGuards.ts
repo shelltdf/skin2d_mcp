@@ -26,7 +26,13 @@ export function rejectKnownNonJsonFile(file: File): ImportResult | null {
 
   if (lower.endsWith('.moc3') || lower.endsWith('.moc')) {
     return emptyResult([
-      `「${name}」为 Live2D 模型二进制（.moc3 / .moc），不能单独当 JSON 打开。请导入 ***.model3.json**（可与贴图、.moc3 同次多选，后续版本将支持运行时加载）。`,
+      `「${name}」为 Live2D 模型二进制（.moc3 / .moc），不能单独导入。请将模型目录打成 **单个 .zip**（含 model3、moc、贴图等）后导入。`,
+    ])
+  }
+
+  if (lower.endsWith('.dbproj')) {
+    return emptyResult([
+      `不支持导入 DragonBones 工程文件「${name}」。请从编辑器导出 *_ske.json（运行时骨架）后再导入。`,
     ])
   }
 

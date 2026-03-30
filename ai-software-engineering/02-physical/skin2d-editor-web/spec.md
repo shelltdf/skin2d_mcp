@@ -10,11 +10,10 @@
 ### 导入
 
 - 菜单 **文件 → 导入…** 与工具条「导入」等价：触发本地文件选择（**可多选**）。
-- 支持扩展名：`.json`（含 Live2D `*.model3.json`）、`.gltf`、`.glb`、`.dbproj`（仅当工程为 UTF-8 文本 JSON；多数 `.dbproj` 为二进制/ZIP，须改导 `*_ske.json`）、`.atlas`、常见图片（与 Spine 图集配套）、`.moc3`（多选时由守卫提示，单文件需配合 `model3.json`）。
+- 支持扩展名：`.json`（Spine / DragonBones 等；**单独**的 Live2D `*.model3.json` 会被拒绝并提示使用 zip）、`.zip`（Live2D 整包）、`.gltf`、`.glb`、`.atlas`、常见图片（与 Spine 图集配套）、`.moc3`（单独导入由守卫提示使用 zip）。**不支持** `.dbproj`（工程文件），须改导 `*_ske.json`。
 - **Spine 完整预览**：同一对话框中一次选择骨架 `*.json` + `*.atlas` + atlas 引用的各页贴图（如 `*.png`），使用 `@esotericsoftware/spine-canvas` 在画布上绘制网格/贴图，并由 Pinia `spineRuntime` 驱动 `AnimationState` 播放；时间轴可选动画、播放/暂停。
 - **仅 Spine JSON**：单文件仍走轻量解析与骨骼线回退（无贴图、无运行时网格）。
-- **Live2D 完整预览（zip）**：导入 **单个** `*.zip`（包内含 `*.model3.json`、`.moc3`、贴图等）后在画布区挂载 Live2D 预览（Cubism 4 + `pixi-live2d-display` ZipLoader + JSZip）。因主 Spine `canvas` 隐藏，**滚轮缩放 / 中键拖移 / 双击复位** 绑在 Live2D 容器上；模型默认开启 `autoInteract`。视口平移/缩放通过 PIXI **`Container` 相机层（`viewRoot`）** 实现：`Live2DModel` 局部位置固定为 `(0,0)`，只移动 `viewRoot.position` 与 `model.scale`。**适配倍数**仅在容器宽高变化时用 Cubism **`internalModel` 逻辑宽高** 重算并缓存，避免因 `model.width/height`（受当前 scale 与动画影响）在每次拖/滚轮时重算而产生缩放闪烁。
-- **Live2D 单文件元数据**：单独导入 `*.model3.json` 时仅解析元数据（版本/贴图数/动作组名等），不渲染 Live2D 画布。
+- **Live2D（仅 zip）**：导入 **单个** `*.zip`（包内含 `*.model3.json`、`.moc3`、贴图等）后在画布区挂载 Live2D 预览（Cubism 4 + `pixi-live2d-display` ZipLoader + JSZip）；zip 内 `model3` 元数据由 `extractZipModel3` 解析供属性面板。因主 Spine `canvas` 隐藏，**滚轮缩放 / 中键拖移 / 双击复位** 绑在 Live2D 容器上；模型默认开启 `autoInteract`。视口平移/缩放通过 PIXI **`Container` 相机层（`viewRoot`）** 实现：`Live2DModel` 局部位置固定为 `(0,0)`，只移动 `viewRoot.position` 与 `model.scale`。**适配倍数**仅在容器宽高变化时用 Cubism **`internalModel` 逻辑宽高** 重算并缓存，避免因 `model.width/height`（受当前 scale 与动画影响）在每次拖/滚轮时重算而产生缩放闪烁。单独导入 `*.model3.json` 不予接受。
 - 解析成功后，**属性**区与 **视口** 显示 `ImportResult` 摘要（见下）。
 
 ### ImportResult 字段（单一事实来源）
@@ -40,8 +39,8 @@
 ## 重要过程
 
 1. 用户选择文件（可多选）→ 若含 `.atlas` 与 Spine 特征 JSON，则 `loadSpineBundle` 构建 `TextureAtlas` + `Skeleton` + `AnimationState`；否则单文件走 `importAssetFile`。
-2. 探测格式 → Spine 多文件为完整运行时；其余为轻量解析（glTF 摘要、DragonBones/dbproj 元数据等）。
-3. Live2D zip：先提取 zip 元数据写入 `live2dRuntime.previewImport`，再在 `Live2DViewport` 挂载时调用 `live2dRuntime.mountInto` 完成 Pixi WebGL 视口创建；挂载时用 **JSZip**（`registerPixiZipLoader.ts`）实现 `ZipLoader` 静态方法，再 `Live2DModel.from([zip])`；布局用 **`viewRoot` + 缓存的 `fitBaseScale`**（见导入章节）；成功/失败都要回写 `editor.setImportResult`，保证属性面板状态不滞后。
+2. 探测格式 → Spine 多文件为完整运行时；其余为轻量解析（glTF 摘要、DragonBones 元数据等）。
+3. Live2D zip：先提取 zip 元数据写入 `live2dRuntime.previewImport`，再在 `Live2DViewport` 挂载时 `mountInto`；**JSZip** 注册 `ZipLoader` 后 `Live2DModel.from([zip])`；布局用 **`viewRoot` + 缓存 `fitBaseScale`**；成功/失败回写 `editor.setImportResult`。
 4. 状态写入 Pinia（`editor` + 可选 `spineRuntime` / `live2dRuntime`）→ 视口 `requestAnimationFrame` 循环中若 `spineRuntime.playing` 则 `tick`，并 `SkeletonRenderer.draw` 与骨骼线叠加；当 `live2dRuntime.showViewport` 为 true 时用 Live2D 视口替换 canvas 绘制。
 
 ## 视口显示层

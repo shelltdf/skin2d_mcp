@@ -75,9 +75,8 @@ export function parseLive2dModel3(obj: unknown, fileLabel: string): ImportResult
         ? (root as { name: string }).name
         : baseName
 
-  const warnings: string[] = [
-    '已识别 Live2D Cubism model3.json。单文件仅展示元数据；完整预览请将模型目录打包为 **zip** 后导入（含 .model3.json、.moc3、贴图）。',
-  ]
+  /** 单文件 import 已禁用；仅 zip 路径调用，由 extractZipModel3 覆盖 warnings */
+  const warnings: string[] = []
 
   const mocHint = typeof moc === 'string' ? moc : undefined
   let versionHint = version != null ? `Live2D model3 · Version ${version}` : 'Live2D model3'

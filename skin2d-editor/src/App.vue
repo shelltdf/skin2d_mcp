@@ -30,7 +30,7 @@ const t = ui.t
 
 /** 与「全部类型」一致的 accept（扩展名为主，便于各浏览器文件类型下拉一致） */
 const ACCEPT_ALL_IMPORT =
-  '.json,.gltf,.glb,.dbproj,.atlas,.png,.jpg,.jpeg,.webp,.moc3,.zip'
+  '.json,.gltf,.glb,.atlas,.png,.jpg,.jpeg,.webp,.moc3,.zip'
 
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const formatsHelpOpen = ref(false)
@@ -44,7 +44,7 @@ const viewportFsRef = ref<HTMLElement | null>(null)
 const importBtnRef = ref<HTMLButtonElement | null>(null)
 const importAccept = ref(ACCEPT_ALL_IMPORT)
 const importMultiple = ref(true)
-const importMode = ref<'any' | 'spine' | 'live2dZip' | 'live2dModel3' | 'dragonbones' | 'gltf'>('any')
+const importMode = ref<'any' | 'spine' | 'live2dZip' | 'dragonbones' | 'gltf'>('any')
 const importChooserOpen = ref(false)
 const importChooserRef = ref<HTMLElement | null>(null)
 const dockSnapshotBeforeCanvasFs = ref<{ left: boolean; right: boolean; bottom: boolean } | null>(null)
@@ -87,12 +87,8 @@ function triggerTypedImport(kind: typeof importMode.value) {
   } else if (kind === 'live2dZip') {
     importAccept.value = '.zip'
     importMultiple.value = false
-  } else if (kind === 'live2dModel3') {
-    // 多数浏览器不接受「.model3.json」作为筛选项，仅用 .json；用户需自选 *.model3.json
-    importAccept.value = '.json'
-    importMultiple.value = false
   } else if (kind === 'dragonbones') {
-    importAccept.value = '.dbproj,.json'
+    importAccept.value = '.json'
     importMultiple.value = false
   } else if (kind === 'gltf') {
     importAccept.value = '.glb,.gltf'
@@ -376,18 +372,10 @@ onUnmounted(() => {
                 <div class="ci-main">Live2D</div>
                 <div class="ci-sub">{{ t('单选：.zip（画布预览）', 'Single: .zip (canvas preview)') }}</div>
               </button>
-              <button
-                type="button"
-                class="chooser-item"
-                @click="closeImportChooser(); triggerTypedImport('live2dModel3')"
-              >
-                <div class="ci-main">Live2D</div>
-                <div class="ci-sub">{{ t('单选：.model3.json（仅元数据）', 'Single: .model3.json (metadata only)') }}</div>
-              </button>
               <button type="button" class="chooser-item" @click="closeImportChooser(); triggerTypedImport('dragonbones')">
                 <div class="ci-main">DragonBones</div>
                 <div class="ci-sub">{{
-                  t('单选：优先 *_ske.json；仅文本型 .dbproj 可解析', 'Single: prefer *_ske.json; text .dbproj only if JSON')
+                  t('单选：*_ske.json 等 DragonBones 骨架 JSON', 'Single: DragonBones skeleton JSON (e.g. *_ske.json)')
                 }}</div>
               </button>
               <button type="button" class="chooser-item" @click="closeImportChooser(); triggerTypedImport('gltf')">

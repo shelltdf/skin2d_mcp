@@ -16,12 +16,11 @@
 | Spine 多文件运行时加载 | `skin2d-editor/src/spine/spineBundleLoader.ts` |
 | Spine 运行时状态（播放/动画） | `skin2d-editor/src/stores/spineRuntime.ts` |
 | Spine JSON 解析 | `skin2d-editor/src/importers/spine.ts` |
-| Live2D model3.json | `skin2d-editor/src/importers/live2d.ts` |
+| Live2D model3 解析（仅 zip 内，`parseLive2dModel3`） | `skin2d-editor/src/importers/live2d.ts`；由 `extractZipModel3` 调用 |
 | Live2D zip 元数据提取 | `skin2d-editor/src/live2d/extractZipModel3.ts` |
 | Live2D 运行时（JSZip 注册 ZipLoader + pixi-live2d-display） | `skin2d-editor/src/stores/live2dRuntime.ts`、`skin2d-editor/src/live2d/registerPixiZipLoader.ts` |
 | Live2D 视口挂载 | `skin2d-editor/src/components/Live2DViewport.vue` |
 | DragonBones 解析 | `skin2d-editor/src/importers/dragonbones.ts` |
-| dbproj 工程归一化 / 导入 | `skin2d-editor/src/importers/dbproj.ts` |
 | glTF 摘要 | `skin2d-editor/src/importers/gltf.ts` |
 | 状态 | `skin2d-editor/src/stores/editor.ts` |
 | 视口显示层开关 | `skin2d-editor/src/stores/viewportDisplay.ts` |
