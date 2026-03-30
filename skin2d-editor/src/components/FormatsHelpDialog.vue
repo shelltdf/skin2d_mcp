@@ -67,7 +67,13 @@ onUnmounted(() => {
           <section>
             <h3>Spine JSON（<code>*.json</code>）</h3>
             <ul>
-              <li><strong>内容</strong>：Spine 编辑器导出的骨架 JSON（含 <code>skeleton</code>、<code>bones</code> 等）。</li>
+              <li>
+                <strong>贴图与动画预览</strong>：在导入对话框中<strong>一次多选</strong>同一角色的
+                <code>*.json</code>（骨架）<strong>与</strong>
+                <code>*.atlas</code>（图集描述）<strong>与</strong> atlas 中引用的各页
+                <code>*.png</code>（或同名的 <code>jpg</code> 等），即可在画布上绘制贴图并播放动画。
+              </li>
+              <li><strong>仅骨架 JSON</strong>：只选单个 JSON 时仍可解析骨骼元数据并尝试骨骼线回退，但<strong>无贴图、无 Spine 运行时网格绘制</strong>。</li>
               <li><strong>版本</strong>：项目依赖 <code>@esotericsoftware/spine-core</code>（当前为 4.x 系列）。导出时请尽量选择<strong>与运行时一致</strong>的编辑器导出选项。</li>
               <li><strong>兼容性</strong>：编辑器大版本（如 3.8 与 4.x）字段与行为不同；若官方运行时解析失败，会尝试 JSON 回退绘制骨骼，可能与引擎内姿态略有差异。</li>
               <li><strong>注意</strong>：<strong>不能</strong>直接打开 Spine 工程文件 <code>.spine</code>；请在 Spine Editor 中先导出 JSON。</li>

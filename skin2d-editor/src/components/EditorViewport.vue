@@ -1,10 +1,15 @@
 <script setup lang="ts">
+import { SkeletonRenderer } from '@esotericsoftware/spine-canvas'
+import type { Skeleton } from '@esotericsoftware/spine-core'
 import { onMounted, onUnmounted, ref, watch } from 'vue'
-import { useEditorStore } from '../stores/editor'
 import type { RigPreviewBone } from '../importers/types'
+import { useEditorStore } from '../stores/editor'
+import { useSpineRuntimeStore } from '../stores/spineRuntime'
 
 const store = useEditorStore()
+const spineStore = useSpineRuntimeStore()
 const canvasRef = ref<HTMLCanvasElement | null>(null)
+let skRenderer: SkeletonRenderer | null = null
 
 /** 世界空间中心（视口中心对准的点） */
 const cameraCx = ref(0)
@@ -33,6 +38,15 @@ function worldToScreen(wx: number, wy: number, w: number, h: number) {
   }
 }
 
+function rigBonesFromSkeleton(sk: Skeleton): RigPreviewBone[] {
+  return sk.bones.map((b) => ({
+    name: b.data.name,
+    worldX: b.worldX,
+    worldY: b.worldY,
+    parentName: b.parent ? b.parent.data.name : null,
+  }))
+}
+
 function fitRigToView(bones: RigPreviewBone[] | undefined, w: number, h: number) {
   if (!bones?.length) {
     cameraCx.value = 0
@@ -59,6 +73,27 @@ function fitRigToView(bones: RigPreviewBone[] | undefined, w: number, h: number)
   cameraCy.value = (minY + maxY) / 2
   viewScale.value = Math.max(0.01, s)
   baseFitScale.value = viewScale.value
+}
+
+/** 有 Spine 附件包围盒时优先用其适配视口 */
+function fitSpineAttachmentBounds(w: number, h: number) {
+  const sk = spineStore.bundle?.skeleton
+  if (!sk) return
+  try {
+    const r = sk.getBoundsRect()
+    if (r.width > 0 && r.height > 0) {
+      const pad = 56
+      const sx = Math.min((w - pad * 2) / r.width, (h - pad * 2) / r.height, 8)
+      cameraCx.value = r.x + r.width / 2
+      cameraCy.value = r.y + r.height / 2
+      viewScale.value = Math.max(0.01, sx)
+      baseFitScale.value = viewScale.value
+      return
+    }
+  } catch {
+    /* fall through */
+  }
+  fitRigToView(rigBonesFromSkeleton(sk), w, h)
 }
 
 function drawWorldGrid(ctx: CanvasRenderingContext2D, w: number, h: number) {
@@ -166,7 +201,20 @@ function draw() {
   drawWorldGrid(ctx, w, h)
 
   const imp = store.lastImport
-  const rigBones = imp?.rigPreview?.bones
+  const skLive = spineStore.ready && spineStore.bundle ? spineStore.bundle.skeleton : null
+  const rigBones = skLive ? rigBonesFromSkeleton(skLive) : imp?.rigPreview?.bones
+
+  if (spineStore.ready && spineStore.bundle) {
+    if (!skRenderer) skRenderer = new SkeletonRenderer(ctx)
+    skRenderer.triangleRendering = true
+    ctx.save()
+    ctx.translate(w / 2, h / 2)
+    ctx.scale(viewScale.value, viewScale.value)
+    ctx.translate(-cameraCx.value, -cameraCy.value)
+    skRenderer.draw(spineStore.bundle.skeleton)
+    ctx.restore()
+  }
+
   if (rigBones?.length) {
     drawSpineRig(ctx, w, h, rigBones)
   }
@@ -184,6 +232,9 @@ function draw() {
     }
   } else {
     lines.push('请通过「文件 → 导入…」加载 Spine / DragonBones / glTF')
+  }
+  if (spineStore.ready) {
+    lines.push(spineStore.playing ? '动画：播放中' : '动画：已暂停')
   }
   const z = baseFitScale.value > 0 ? viewScale.value / baseFitScale.value : 1
   lines.push(`缩放 ×${z.toFixed(2)} · 中键拖移 · 滚轮缩放 · 双击复位`)
@@ -256,14 +307,28 @@ function onPointerUp(e: PointerEvent) {
 function onDblClick(e: MouseEvent) {
   e.preventDefault()
   const { w, h } = getCanvasCssSize()
-  fitRigToView(store.lastImport?.rigPreview?.bones, w, h)
+  if (spineStore.ready) fitSpineAttachmentBounds(w, h)
+  else fitRigToView(store.lastImport?.rigPreview?.bones, w, h)
   draw()
 }
 
 let resizeObs: ResizeObserver | null = null
+let rafId = 0
+let lastFrameTime = performance.now()
+
+function frameLoop(now: number) {
+  rafId = requestAnimationFrame(frameLoop)
+  const delta = Math.min(0.1, (now - lastFrameTime) / 1000)
+  lastFrameTime = now
+  if (spineStore.ready && spineStore.playing) {
+    spineStore.tick(delta)
+  }
+  draw()
+}
 
 onMounted(() => {
-  draw()
+  lastFrameTime = performance.now()
+  rafId = requestAnimationFrame(frameLoop)
   window.addEventListener('resize', draw)
   const c = canvasRef.value
   if (c && typeof ResizeObserver !== 'undefined') {
@@ -273,6 +338,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  cancelAnimationFrame(rafId)
   window.removeEventListener('resize', draw)
   resizeObs?.disconnect()
 })
@@ -281,10 +347,22 @@ watch(
   () => [store.lastImport, store.lastFileName],
   () => {
     const { w, h } = getCanvasCssSize()
-    fitRigToView(store.lastImport?.rigPreview?.bones, w, h)
+    if (spineStore.ready) fitSpineAttachmentBounds(w, h)
+    else fitRigToView(store.lastImport?.rigPreview?.bones, w, h)
     draw()
   },
   { deep: true },
+)
+
+watch(
+  () => spineStore.ready,
+  (ready) => {
+    if (ready) {
+      const { w, h } = getCanvasCssSize()
+      fitSpineAttachmentBounds(w, h)
+      draw()
+    }
+  },
 )
 </script>
 

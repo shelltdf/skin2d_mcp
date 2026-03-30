@@ -9,8 +9,10 @@
 
 ### 导入
 
-- 菜单 **文件 → 导入…** 与工具条「导入」等价：触发本地文件选择。
-- 支持扩展名：`.json`、`.gltf`、`.glb`、`.dbproj`（DragonBones 工程，须为 UTF-8 JSON）。
+- 菜单 **文件 → 导入…** 与工具条「导入」等价：触发本地文件选择（**可多选**）。
+- 支持扩展名：`.json`、`.gltf`、`.glb`、`.dbproj`（DragonBones 工程，须为 UTF-8 JSON）、`.atlas`、常见图片（与 Spine 图集配套）。
+- **Spine 完整预览**：同一对话框中一次选择骨架 `*.json` + `*.atlas` + atlas 引用的各页贴图（如 `*.png`），使用 `@esotericsoftware/spine-canvas` 在画布上绘制网格/贴图，并由 Pinia `spineRuntime` 驱动 `AnimationState` 播放；时间轴可选动画、播放/暂停。
+- **仅 Spine JSON**：单文件仍走轻量解析与骨骼线回退（无贴图、无运行时网格）。
 - 解析成功后，**属性**区与 **视口** 显示 `ImportResult` 摘要（见下）。
 
 ### ImportResult 字段（单一事实来源）
@@ -33,9 +35,9 @@
 
 ## 重要过程
 
-1. 用户选择文件 → `FileReader` 读文本或 ArrayBuffer（glTF 二进制）。
-2. 探测格式 → 调用对应轻量解析（计数骨骼等，不全量实现播放器）。
-3. 状态写入 Pinia → Vue 响应式更新面板与画布文字。
+1. 用户选择文件（可多选）→ 若含 `.atlas` 与 Spine 特征 JSON，则 `loadSpineBundle` 构建 `TextureAtlas` + `Skeleton` + `AnimationState`；否则单文件走 `importAssetFile`。
+2. 探测格式 → Spine 多文件为完整运行时；其余为轻量解析（glTF 摘要、DragonBones/dbproj 元数据等）。
+3. 状态写入 Pinia（`editor` + 可选 `spineRuntime`）→ 视口 `requestAnimationFrame` 循环中若 `spineRuntime.playing` 则 `tick`，并 `SkeletonRenderer.draw` 与骨骼线叠加。
 
 ## 技术约束
 
