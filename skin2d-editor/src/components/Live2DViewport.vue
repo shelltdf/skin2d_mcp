@@ -1,20 +1,16 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue'
 import { useLive2dRuntimeStore } from '../stores/live2dRuntime'
-import { useEditorStore } from '../stores/editor'
+import { useUiSettingsStore } from '../stores/uiSettings'
 
 const live2d = useLive2dRuntimeStore()
-const editor = useEditorStore()
+const ui = useUiSettingsStore()
+const t = ui.t
 const el = ref<HTMLDivElement | null>(null)
 
 onMounted(async () => {
   if (!el.value) return
   await live2d.mountInto(el.value)
-  if (live2d.loadError) {
-    editor.setImportResult(editor.lastFileName, live2d.previewImport, live2d.loadError)
-  } else if (live2d.previewImport) {
-    editor.setImportResult(editor.lastFileName, live2d.previewImport, null)
-  }
 })
 
 onUnmounted(() => {
@@ -26,7 +22,7 @@ onUnmounted(() => {
   <div class="live2d-root">
     <div ref="el" class="live2d-canvas-host" />
     <p v-if="live2d.pendingZip && !live2d.ready && !live2d.loadError" class="live2d-loading">
-      正在加载 Live2D…
+      {{ t('正在加载 Live2D…', 'Loading Live2D…') }}
     </p>
   </div>
 </template>

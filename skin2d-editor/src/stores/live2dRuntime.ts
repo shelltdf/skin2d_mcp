@@ -2,6 +2,9 @@ import { defineStore } from 'pinia'
 import { computed, ref, shallowRef } from 'vue'
 import type { ImportResult } from '../importers/types'
 import { extractLive2dMetaFromZip } from '../live2d/extractZipModel3'
+import { useAppLogStore } from './appLog'
+import { useEditorStore } from './editor'
+import { useUiSettingsStore } from './uiSettings'
 export const useLive2dRuntimeStore = defineStore('live2dRuntime', () => {
   const pendingZip = shallowRef<File | null>(null)
   const ready = ref(false)
@@ -32,14 +35,19 @@ export const useLive2dRuntimeStore = defineStore('live2dRuntime', () => {
   async function queueZip(file: File): Promise<void> {
     dispose()
     loadError.value = null
+    const appLog = useAppLogStore()
+    const ui = useUiSettingsStore()
+    const t = ui.t
     const meta = await extractLive2dMetaFromZip(file)
     if (meta.formatId !== 'live2d') {
-      loadError.value = meta.warnings[0] ?? '无法从 zip 识别 Live2D 模型'
+      loadError.value = meta.warnings[0] ?? t('无法从 zip 识别 Live2D 模型', 'Unable to recognize Live2D model from zip')
       previewImport.value = meta
+      appLog.warn(t('Live2D zip 未识别为模型', 'Live2D zip not recognized'), loadError.value)
       return
     }
     previewImport.value = meta
     pendingZip.value = file
+    appLog.info(t('Live2D zip 元数据已解析', 'Live2D zip metadata parsed'), file.name)
   }
 
   /** 挂载 WebGL 视口并加载 zip 内模型（pixi-live2d-display ZipLoader） */
@@ -47,11 +55,17 @@ export const useLive2dRuntimeStore = defineStore('live2dRuntime', () => {
     if (!pendingZip.value) return
     const zipFile = pendingZip.value
     loadError.value = null
+    const appLog = useAppLogStore()
+    const ui = useUiSettingsStore()
+    const t = ui.t
 
     try {
       if (typeof (window as unknown as { Live2DCubismCore?: unknown }).Live2DCubismCore === 'undefined') {
         throw new Error(
-          '未检测到 Live2DCubismCore。请在 index.html 中引入 Cubism Core 脚本（见官方 Cubism SDK for Web）。',
+          t(
+            '未检测到 Live2DCubismCore。请在 index.html 中引入 Cubism Core 脚本（见官方 Cubism SDK for Web）。',
+            'Live2DCubismCore not found. Include Cubism Core script in index.html (Cubism SDK for Web).',
+          ),
         )
       }
 
@@ -103,9 +117,17 @@ export const useLive2dRuntimeStore = defineStore('live2dRuntime', () => {
         previewImport.value = {
           ...previewImport.value,
           skeletonName: name ?? previewImport.value.skeletonName,
-          warnings: ['Live2D 模型已加载（Cubism 4 + pixi-live2d-display）。'],
+          warnings: [t('Live2D 预览已就绪（Cubism 4 + pixi-live2d-display）。', 'Live2D preview ready (Cubism 4 + pixi-live2d-display).')],
         }
       }
+      const ed = useEditorStore()
+      if (previewImport.value) {
+        ed.setImportResult(ed.lastFileName, previewImport.value, null)
+      }
+      appLog.info(
+        t('Live2D 预览加载成功', 'Live2D preview loaded'),
+        (name ?? previewImport.value?.skeletonName) ?? zipFile.name,
+      )
     } catch (e) {
       loadError.value = e instanceof Error ? e.message : String(e)
       pendingZip.value = null
@@ -116,6 +138,9 @@ export const useLive2dRuntimeStore = defineStore('live2dRuntime', () => {
         /* ignore */
       }
       pixiApp = null
+      const ed = useEditorStore()
+      ed.setImportResult(ed.lastFileName, previewImport.value, loadError.value)
+      appLog.error(t('Live2D 预览加载失败', 'Live2D preview failed'), loadError.value)
     }
   }
 

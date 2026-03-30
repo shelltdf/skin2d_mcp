@@ -18,6 +18,15 @@
 | 构建 | `npm run build` |
 | 预览构建 | `npm run preview` |
 
+## 调试与排障
+
+- 应用内日志：Pinia `appLog` 收集导入/运行时/全屏等操作、警告与错误；状态栏显示最新一条，点击打开日志窗口。
+- Vue 运行时错误：在 `main.ts` 的 `errorHandler` 中写入 `appLog`（便于在纯前端环境定位问题）。
+
+## UI 设置
+
+- 多语言与主题：Pinia `uiSettings`（localStorage 持久化）；`applyToDom()` 会设置 `document.documentElement.lang` 与 `data-theme`。
+
 ## Python 封装（仓库根）
 
 实现目录为 `skin2d-editor/` 时，可在仓库根使用：

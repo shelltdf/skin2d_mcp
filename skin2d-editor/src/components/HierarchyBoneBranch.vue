@@ -2,10 +2,13 @@
 import HierarchyBoneBranch from './HierarchyBoneBranch.vue'
 import type { BoneTreeNode } from '../lib/hierarchyTree'
 import { useHierarchySelectionStore } from '../stores/hierarchySelection'
+import { useUiSettingsStore } from '../stores/uiSettings'
 
 withDefaults(defineProps<{ nodes: BoneTreeNode[]; depth?: number }>(), { depth: 0 })
 
 const hierarchy = useHierarchySelectionStore()
+const ui = useUiSettingsStore()
+const t = ui.t
 
 function isSelected(name: string) {
   return hierarchy.selected?.kind === 'bone' && hierarchy.selected.name === name
@@ -22,7 +25,7 @@ function onClick(name: string) {
       <button type="button" class="node-row" :class="{ sel: isSelected(n.name) }" @click="onClick(n.name)">
         <span class="node-name">{{ n.name }}</span>
         <span v-if="n.index >= 0" class="node-meta">#{{ n.index }} · L{{ n.length.toFixed(0) }}</span>
-        <span v-else class="node-meta muted">预览</span>
+        <span v-else class="node-meta muted">{{ t('预览', 'Preview') }}</span>
       </button>
       <HierarchyBoneBranch v-if="n.children.length" :nodes="n.children" :depth="depth + 1" />
     </li>

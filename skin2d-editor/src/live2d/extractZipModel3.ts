@@ -30,7 +30,9 @@ export async function extractLive2dMetaFromZip(file: File): Promise<ImportResult
     const base = parseLive2dModel3(obj, modelPath.split(/[/\\]/).pop() ?? modelPath)
     return {
       ...base,
-      warnings: ['已从 zip 读取模型描述，正在加载 Cubism 预览…'],
+      warnings: [
+        '已从 zip 解析 model3 元数据。画布预览加载完成后，右侧「提示」会自动更新为已就绪状态。',
+      ],
     }
   } catch (e) {
     return emptyResult([

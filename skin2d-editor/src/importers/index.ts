@@ -6,6 +6,7 @@ import { parseDragonBonesJson } from './dragonbones'
 import { parseGltfFile } from './gltf'
 import { isLive2dModel3Json, parseLive2dModel3 } from './live2d'
 import { parseSpineJsonString } from './spine'
+import { useUiSettingsStore } from '../stores/uiSettings'
 
 function tryParseJson(text: string): unknown {
   return JSON.parse(text) as unknown
@@ -24,6 +25,7 @@ function isDragonBonesLike(obj: unknown): boolean {
 }
 
 export async function importAssetFile(file: File): Promise<ImportResult> {
+  const t = useUiSettingsStore().t
   const lower = file.name.toLowerCase()
 
   if (lower.endsWith('.glb') || lower.endsWith('.gltf')) {
@@ -39,7 +41,9 @@ export async function importAssetFile(file: File): Promise<ImportResult> {
   try {
     text = await file.text()
   } catch (e) {
-    return emptyResult([`无法读取文件：${e instanceof Error ? e.message : String(e)}`])
+    return emptyResult([
+      t(`无法读取文件：${e instanceof Error ? e.message : String(e)}`, `Unable to read file: ${e instanceof Error ? e.message : String(e)}`),
+    ])
   }
 
   const shapeHint = assertTextLooksLikeJson(text, file.name)
@@ -52,7 +56,10 @@ export async function importAssetFile(file: File): Promise<ImportResult> {
     obj = tryParseJson(text)
   } catch {
     return emptyResult([
-      `「${file.name}」无法解析为合法 JSON。请确认文件为 UTF-8 编码的 Spine / DragonBones / Live2D / dbproj 文本导出，且未被截断或混入二进制数据。`,
+      t(
+        `「${file.name}」无法解析为合法 JSON。请确认文件为 UTF-8 编码的 Spine / DragonBones / Live2D / dbproj 文本导出，且未被截断或混入二进制数据。`,
+        `“${file.name}” is not valid JSON. Ensure it is a UTF-8 text export from Spine/DragonBones/Live2D/dbproj and not truncated or mixed with binary data.`,
+      ),
     ])
   }
 
@@ -77,7 +84,10 @@ export async function importAssetFile(file: File): Promise<ImportResult> {
   }
 
   return emptyResult([
-    `无法识别 JSON 骨架格式（非 Spine / DragonBones / Live2D model3 / dbproj 特征）。文件：${file.name}`,
+    t(
+      `无法识别 JSON 骨架格式（非 Spine / DragonBones / Live2D model3 / dbproj 特征）。文件：${file.name}`,
+      `Unrecognized JSON rig format (not Spine/DragonBones/Live2D model3/dbproj). File: ${file.name}`,
+    ),
   ])
 }
 

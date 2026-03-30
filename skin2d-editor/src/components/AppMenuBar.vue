@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
+import { useUiSettingsStore } from '../stores/uiSettings'
 
 const emit = defineEmits<{
   import: []
@@ -8,15 +9,49 @@ const emit = defineEmits<{
   formatsHelp: []
 }>()
 
-const activeMenu = ref<'file' | 'help' | null>(null)
+const ui = useUiSettingsStore()
 
-function toggleMenu(which: 'file' | 'help') {
+const activeMenu = ref<'file' | 'help' | 'lang' | 'style' | null>(null)
+const navRef = ref<HTMLElement | null>(null)
+
+function toggleMenu(which: 'file' | 'help' | 'lang' | 'style') {
   activeMenu.value = activeMenu.value === which ? null : which
 }
 
 function closeMenus() {
   activeMenu.value = null
 }
+
+function onGlobalPointerDown(e: PointerEvent) {
+  if (!activeMenu.value) return
+  const nav = navRef.value
+  if (!nav) return
+  const t = e.target as Node | null
+  if (t && nav.contains(t)) return
+  closeMenus()
+}
+
+function onGlobalKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape' && activeMenu.value) {
+    e.preventDefault()
+    closeMenus()
+  }
+}
+
+function onTopHover(which: 'file' | 'help' | 'lang' | 'style') {
+  if (!activeMenu.value) return
+  activeMenu.value = which
+}
+
+onMounted(() => {
+  document.addEventListener('pointerdown', onGlobalPointerDown)
+  document.addEventListener('keydown', onGlobalKeydown)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('pointerdown', onGlobalPointerDown)
+  document.removeEventListener('keydown', onGlobalKeydown)
+})
 
 function onImport() {
   closeMenus()
@@ -37,6 +72,20 @@ function onFormatsHelp() {
   closeMenus()
   emit('formatsHelp')
 }
+
+function t(zh: string, en: string) {
+  return ui.language === 'en' ? en : zh
+}
+
+function setLang(v: 'zh' | 'en') {
+  closeMenus()
+  ui.setLanguage(v)
+}
+
+function setTheme(v: 'system' | 'light' | 'dark') {
+  closeMenus()
+  ui.setTheme(v)
+}
 </script>
 
 <template>
@@ -45,23 +94,98 @@ function onFormatsHelp() {
       <span class="app-icon" aria-hidden="true">◇</span>
       <span class="app-title">Skin2D</span>
     </div>
-    <nav class="menubar" @mouseleave="closeMenus">
+    <nav ref="navRef" class="menubar">
       <div class="menu-wrap">
-        <button type="button" class="menu-top" @click="toggleMenu('file')">文件</button>
+        <button
+          type="button"
+          class="menu-top"
+          @click="toggleMenu('file')"
+          @pointerenter="onTopHover('file')"
+        >
+          {{ t('文件', 'File') }}
+        </button>
         <div v-if="activeMenu === 'file'" class="dropdown">
-          <button type="button" class="menu-item" @click="onNew">新建工程</button>
-          <button type="button" class="menu-item" @click="onOpen">打开…</button>
+          <button type="button" class="menu-item" @click="onNew">{{ t('新建工程', 'New Project') }}</button>
+          <button type="button" class="menu-item" @click="onOpen">{{ t('打开…', 'Open…') }}</button>
           <div class="sep" />
-          <button type="button" class="menu-item accent" @click="onImport">导入…</button>
+          <button type="button" class="menu-item accent" @click="onImport">{{ t('导入…', 'Import…') }}</button>
         </div>
       </div>
-      <button type="button" class="menu-top" disabled title="即将推出">编辑</button>
-      <button type="button" class="menu-top" disabled title="即将推出">视图</button>
+      <button type="button" class="menu-top" disabled :title="t('即将推出', 'Coming soon')">
+        {{ t('编辑', 'Edit') }}
+      </button>
+      <button type="button" class="menu-top" disabled :title="t('即将推出', 'Coming soon')">
+        {{ t('视图', 'View') }}
+      </button>
+
       <div class="menu-wrap">
-        <button type="button" class="menu-top" @click="toggleMenu('help')">帮助</button>
+        <button
+          type="button"
+          class="menu-top"
+          @click="toggleMenu('lang')"
+          @pointerenter="onTopHover('lang')"
+        >
+          {{ t('语言', 'Language') }}
+        </button>
+        <div v-if="activeMenu === 'lang'" class="dropdown">
+          <button type="button" class="menu-item" :class="{ checked: ui.language === 'zh' }" @click="setLang('zh')">
+            {{ t('中文', 'Chinese') }}
+          </button>
+          <button type="button" class="menu-item" :class="{ checked: ui.language === 'en' }" @click="setLang('en')">
+            English
+          </button>
+        </div>
+      </div>
+
+      <div class="menu-wrap">
+        <button
+          type="button"
+          class="menu-top"
+          @click="toggleMenu('style')"
+          @pointerenter="onTopHover('style')"
+        >
+          {{ t('样式', 'Style') }}
+        </button>
+        <div v-if="activeMenu === 'style'" class="dropdown">
+          <button
+            type="button"
+            class="menu-item"
+            :class="{ checked: ui.theme === 'system' }"
+            @click="setTheme('system')"
+          >
+            {{ t('跟随系统', 'Follow system') }}
+          </button>
+          <button
+            type="button"
+            class="menu-item"
+            :class="{ checked: ui.theme === 'light' }"
+            @click="setTheme('light')"
+          >
+            {{ t('浅色', 'Light') }}
+          </button>
+          <button
+            type="button"
+            class="menu-item"
+            :class="{ checked: ui.theme === 'dark' }"
+            @click="setTheme('dark')"
+          >
+            {{ t('深色', 'Dark') }}
+          </button>
+        </div>
+      </div>
+
+      <div class="menu-wrap">
+        <button
+          type="button"
+          class="menu-top"
+          @click="toggleMenu('help')"
+          @pointerenter="onTopHover('help')"
+        >
+          {{ t('帮助', 'Help') }}
+        </button>
         <div v-if="activeMenu === 'help'" class="dropdown dropdown-help">
           <button type="button" class="menu-item accent" @click="onFormatsHelp">
-            支持的文件格式…
+            {{ t('支持的文件格式…', 'Supported formats…') }}
           </button>
         </div>
       </div>
@@ -159,10 +283,11 @@ function onFormatsHelp() {
   text-align: left;
   border: none;
   background: transparent;
-  padding: 8px 12px;
+  padding: 8px 12px 8px 34px;
   border-radius: var(--win-radius-sm);
   font-size: 13px;
   color: var(--win-text);
+  position: relative;
 }
 
 .menu-item:hover {
@@ -172,6 +297,24 @@ function onFormatsHelp() {
 .menu-item.accent {
   color: var(--win-accent);
   font-weight: 600;
+}
+
+.menu-item::before {
+  content: '';
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+}
+
+.menu-item.checked::before {
+  content: '✓';
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--win-accent);
 }
 
 .sep {

@@ -4,11 +4,14 @@ import { boneTreeFromRigPreview, boneTreeFromSkeletonData } from '../lib/hierarc
 import { useEditorStore } from '../stores/editor'
 import { useHierarchySelectionStore } from '../stores/hierarchySelection'
 import { useSpineRuntimeStore } from '../stores/spineRuntime'
+import { useUiSettingsStore } from '../stores/uiSettings'
 import HierarchyBoneBranch from './HierarchyBoneBranch.vue'
 
 const store = useEditorStore()
 const spineStore = useSpineRuntimeStore()
 const hierarchy = useHierarchySelectionStore()
+const ui = useUiSettingsStore()
+const t = ui.t
 
 function blendLabel(m: number): string {
   const labels = ['Normal', 'Additive', 'Multiply', 'Screen']
@@ -55,7 +58,7 @@ const animationRows = computed(() => {
 })
 
 const hint = computed(() => {
-  if (!store.lastImport) return '尚未导入骨架。使用「文件 → 导入…」'
+  if (!store.lastImport) return t('尚未导入骨架。使用「文件 → 导入…」', 'No skeleton imported. Use “File → Import…”')
   return ''
 })
 
@@ -63,7 +66,7 @@ const formatSummary = computed(() => {
   const r = store.lastImport
   if (!r) return ''
   const parts: string[] = []
-  parts.push(`格式 ${r.formatId}`)
+  parts.push(t('格式', 'Format') + ` ${r.formatId}`)
   if (r.versionHint) parts.push(r.versionHint)
   if (r.skeletonName) parts.push(`「${r.skeletonName}」`)
   return parts.join(' · ')
@@ -84,27 +87,27 @@ function isAnimSel(name: string) {
 
 <template>
   <aside class="panel">
-    <div class="panel-head">层级</div>
+    <div class="panel-head">{{ t('层级', 'Hierarchy') }}</div>
     <div class="panel-body">
       <p v-if="hint" class="hint">{{ hint }}</p>
       <template v-else>
         <p class="meta">{{ formatSummary }}</p>
         <p v-if="store.lastImport?.boneCount != null" class="counts">
-          骨骼 {{ store.lastImport.boneCount }}
-          <template v-if="store.lastImport.slotCount != null"> · 插槽 {{ store.lastImport.slotCount }}</template>
-          <template v-if="store.lastImport.skinCount != null"> · 皮肤 {{ store.lastImport.skinCount }}</template>
+          {{ t('骨骼', 'Bones') }} {{ store.lastImport.boneCount }}
+          <template v-if="store.lastImport.slotCount != null"> · {{ t('插槽', 'Slots') }} {{ store.lastImport.slotCount }}</template>
+          <template v-if="store.lastImport.skinCount != null"> · {{ t('皮肤', 'Skins') }} {{ store.lastImport.skinCount }}</template>
           <template v-if="(store.lastImport.animationNames?.length ?? 0) > 0">
-            · 动画 {{ store.lastImport.animationNames!.length }}
+            · {{ t('动画', 'Animations') }} {{ store.lastImport.animationNames!.length }}
           </template>
         </p>
 
         <details v-if="boneTree.length" open class="block">
-          <summary>骨骼</summary>
+          <summary>{{ t('骨骼', 'Bones') }}</summary>
           <HierarchyBoneBranch :nodes="boneTree" />
         </details>
 
         <details v-if="slotRows.length" open class="block">
-          <summary>插槽（{{ slotRows.length }}）</summary>
+          <summary>{{ t('插槽', 'Slots') }}（{{ slotRows.length }}）</summary>
           <ul class="flat-list">
             <li v-for="row in slotRows" :key="row.name">
               <button
@@ -124,7 +127,7 @@ function isAnimSel(name: string) {
         </details>
 
         <details v-if="skinRows.length" open class="block">
-          <summary>皮肤（{{ skinRows.length }}）</summary>
+          <summary>{{ t('皮肤', 'Skins') }}（{{ skinRows.length }}）</summary>
           <ul class="flat-list">
             <li v-for="row in skinRows" :key="row.name">
               <button
@@ -134,14 +137,14 @@ function isAnimSel(name: string) {
                 @click="hierarchy.toggle('skin', row.name)"
               >
                 <span class="row-main">{{ row.name }}</span>
-                <span class="row-sub">附件条目 {{ row.attachments }}</span>
+                <span class="row-sub">{{ t('附件条目', 'Attachment entries') }} {{ row.attachments }}</span>
               </button>
             </li>
           </ul>
         </details>
 
         <details v-if="animationRows.length" open class="block">
-          <summary>动画（{{ animationRows.length }}）</summary>
+          <summary>{{ t('动画', 'Animations') }}（{{ animationRows.length }}）</summary>
           <ul class="flat-list">
             <li v-for="row in animationRows" :key="row.name">
               <button
@@ -152,14 +155,14 @@ function isAnimSel(name: string) {
               >
                 <span class="row-main">{{ row.name }}</span>
                 <span v-if="row.duration != null" class="row-sub">{{ row.duration.toFixed(2) }}s</span>
-                <span v-else class="row-sub muted">时长未知</span>
+                <span v-else class="row-sub muted">{{ t('时长未知', 'Duration unknown') }}</span>
               </button>
             </li>
           </ul>
         </details>
 
         <p v-if="!boneTree.length && !slotRows.length && !animationRows.length" class="muted small">
-          当前导入未提供可列出的层级节点。
+          {{ t('当前导入未提供可列出的层级节点。', 'This import has no listable hierarchy nodes.') }}
         </p>
       </template>
     </div>

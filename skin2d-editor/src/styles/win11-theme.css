@@ -18,6 +18,41 @@
   --win-mono: 'Cascadia Code', Consolas, ui-monospace, monospace;
 }
 
+/* Dark (manual override) */
+:root[data-theme='dark'] {
+  --win-bg: #0f1115;
+  --win-surface: #141821;
+  --win-surface-alt: #10141b;
+  --win-border: rgba(255, 255, 255, 0.10);
+  --win-border-strong: rgba(255, 255, 255, 0.16);
+  --win-text: #e6edf3;
+  --win-text-secondary: rgba(230, 237, 243, 0.70);
+  --win-accent: #4ea1ff;
+  --win-accent-hover: #2f8fff;
+  --win-titlebar: #0f1115;
+  --win-titlebar-border: rgba(255, 255, 255, 0.10);
+  --win-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+}
+
+/* System theme (default): follow OS dark mode */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]),
+  :root[data-theme='system'] {
+    --win-bg: #0f1115;
+    --win-surface: #141821;
+    --win-surface-alt: #10141b;
+    --win-border: rgba(255, 255, 255, 0.10);
+    --win-border-strong: rgba(255, 255, 255, 0.16);
+    --win-text: #e6edf3;
+    --win-text-secondary: rgba(230, 237, 243, 0.70);
+    --win-accent: #4ea1ff;
+    --win-accent-hover: #2f8fff;
+    --win-titlebar: #0f1115;
+    --win-titlebar-border: rgba(255, 255, 255, 0.10);
+    --win-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+  }
+}
+
 *,
 *::before,
 *::after {

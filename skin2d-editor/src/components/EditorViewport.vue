@@ -11,14 +11,20 @@ import { useLive2dRuntimeStore } from '../stores/live2dRuntime'
 import Live2DViewport from './Live2DViewport.vue'
 import { useHierarchySelectionStore } from '../stores/hierarchySelection'
 import { useViewportDisplayStore } from '../stores/viewportDisplay'
+import { useAppLogStore } from '../stores/appLog'
+import { useUiSettingsStore } from '../stores/uiSettings'
 
 const store = useEditorStore()
 const spineStore = useSpineRuntimeStore()
 const live2dStore = useLive2dRuntimeStore()
 const display = useViewportDisplayStore()
 const hierarchySel = useHierarchySelectionStore()
+const appLog = useAppLogStore()
+const ui = useUiSettingsStore()
+const t = ui.t
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 let skRenderer: SkeletonRenderer | null = null
+const displayPanelOpen = ref(true)
 
 /** 世界空间中心（视口中心对准的点） */
 const cameraCx = ref(0)
@@ -510,8 +516,13 @@ function onPointerDown(e: PointerEvent) {
       /* ignore */
     }
     const hit = pickTopmostSlotAtWorldPoint(sk, p.x, p.y)
-    if (hit) hierarchySel.select('slot', hit.data.name)
-    else hierarchySel.clear()
+    if (hit) {
+      hierarchySel.select('slot', hit.data.name)
+            appLog.info(t('画布选中插槽', 'Canvas selected slot'), hit.data.name)
+    } else {
+      hierarchySel.clear()
+            appLog.info(t('画布：清除选择', 'Canvas: clear selection'))
+    }
     draw()
     return
   }
@@ -631,31 +642,41 @@ watch(
 
 <template>
   <div class="viewport-wrap">
-    <div class="layer-bar" @pointerdown.stop @wheel.stop>
-      <span class="layer-bar-title">显示</span>
+    <div class="layer-bar" :class="{ collapsed: !displayPanelOpen }" @pointerdown.stop @wheel.stop>
+      <button
+        type="button"
+        class="layer-bar-toggle"
+        :aria-expanded="displayPanelOpen"
+        :title="t('折叠/展开', 'Collapse/expand')"
+        @click="displayPanelOpen = !displayPanelOpen"
+      >
+        <span class="layer-bar-title">{{ t('显示', 'Display') }}</span>
+        <span class="chev" aria-hidden="true">{{ displayPanelOpen ? '▾' : '▸' }}</span>
+      </button>
+      <div v-show="displayPanelOpen" class="layer-bar-body">
       <label class="layer-item">
         <input v-model="display.showGridLines" type="checkbox" />
-        坐标网格
+        {{ t('坐标网格', 'Grid') }}
       </label>
       <label class="layer-item">
         <input v-model="display.showWorldOrigin" type="checkbox" />
-        世界原点
+        {{ t('世界原点', 'World origin') }}
       </label>
       <label class="layer-item" :class="{ disabled: !spineStore.ready }">
         <input v-model="display.showSpineTexture" type="checkbox" :disabled="!spineStore.ready" />
-        贴图
+        {{ t('贴图', 'Texture') }}
       </label>
       <label class="layer-item" :class="{ disabled: !spineStore.ready }">
         <input v-model="display.showSpineMeshWire" type="checkbox" :disabled="!spineStore.ready" />
-        Mesh 网格线
+        {{ t('贴图网格线', 'Texture mesh wire') }}
       </label>
       <label class="layer-item" :class="{ disabled: !spineStore.ready }">
         <input v-model="display.showSpineRegionWire" type="checkbox" :disabled="!spineStore.ready" />
-        Region 边框线
+        {{ t('Region 边框线', 'Region border') }}
       </label>
       <label class="layer-item">
         <input v-model="display.showBones" type="checkbox" />
-        骨骼
+        {{ t('骨骼', 'Bones') }}
       </label>
       <label
         class="layer-item"
@@ -675,12 +696,13 @@ watch(
               !display.showSpineRegionWire)
           "
         />
-        Spine 调试线
+        {{ t('Spine 调试线', 'Spine debug') }}
       </label>
       <label class="layer-item">
         <input v-model="display.showHud" type="checkbox" />
-        状态信息
+        {{ t('状态信息', 'HUD') }}
       </label>
+      </div>
     </div>
     <Live2DViewport v-if="live2dStore.showViewport" />
     <canvas
@@ -712,9 +734,8 @@ watch(
   right: 8px;
   z-index: 2;
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 12px;
+  flex-direction: column;
+  align-items: stretch;
   max-width: min(420px, calc(100% - 16px));
   padding: 6px 10px;
   border: 1px solid var(--win-border);
@@ -727,10 +748,47 @@ watch(
   pointer-events: auto;
 }
 
+.layer-bar-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 2px 4px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+
+.layer-bar-toggle:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.layer-bar-toggle:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--win-accent) 55%, transparent);
+  outline-offset: 2px;
+}
+
 .layer-bar-title {
   font-weight: 600;
   color: var(--win-text-secondary);
-  margin-right: 4px;
+}
+
+.chev {
+  color: var(--win-text-secondary);
+  font-size: 12px;
+  line-height: 1;
+}
+
+.layer-bar-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 4px;
 }
 
 .layer-item {

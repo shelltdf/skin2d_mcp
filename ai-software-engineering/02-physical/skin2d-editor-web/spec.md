@@ -13,6 +13,8 @@
 - 支持扩展名：`.json`（含 Live2D `*.model3.json`）、`.gltf`、`.glb`、`.dbproj`（DragonBones 工程，须为 UTF-8 JSON）、`.atlas`、常见图片（与 Spine 图集配套）、`.moc3`（多选时由守卫提示，单文件需配合 `model3.json`）。
 - **Spine 完整预览**：同一对话框中一次选择骨架 `*.json` + `*.atlas` + atlas 引用的各页贴图（如 `*.png`），使用 `@esotericsoftware/spine-canvas` 在画布上绘制网格/贴图，并由 Pinia `spineRuntime` 驱动 `AnimationState` 播放；时间轴可选动画、播放/暂停。
 - **仅 Spine JSON**：单文件仍走轻量解析与骨骼线回退（无贴图、无运行时网格）。
+- **Live2D 完整预览（zip）**：导入 **单个** `*.zip`（包内含 `*.model3.json`、`.moc3`、贴图等）后在画布区挂载 Live2D 预览（Cubism 4 + `pixi-live2d-display` ZipLoader），并在属性面板刷新导入摘要与提示。
+- **Live2D 单文件元数据**：单独导入 `*.model3.json` 时仅解析元数据（版本/贴图数/动作组名等），不渲染 Live2D 画布。
 - 解析成功后，**属性**区与 **视口** 显示 `ImportResult` 摘要（见下）。
 
 ### ImportResult 字段（单一事实来源）
@@ -39,11 +41,13 @@
 
 1. 用户选择文件（可多选）→ 若含 `.atlas` 与 Spine 特征 JSON，则 `loadSpineBundle` 构建 `TextureAtlas` + `Skeleton` + `AnimationState`；否则单文件走 `importAssetFile`。
 2. 探测格式 → Spine 多文件为完整运行时；其余为轻量解析（glTF 摘要、DragonBones/dbproj 元数据等）。
-3. 状态写入 Pinia（`editor` + 可选 `spineRuntime`）→ 视口 `requestAnimationFrame` 循环中若 `spineRuntime.playing` 则 `tick`，并 `SkeletonRenderer.draw` 与骨骼线叠加。
+3. Live2D zip：先提取 zip 元数据写入 `live2dRuntime.previewImport`，再在 `Live2DViewport` 挂载时调用 `live2dRuntime.mountInto` 完成 Pixi WebGL 视口创建与 ZipLoader 加载；成功/失败都要回写 `editor.setImportResult`，保证属性面板状态不滞后。
+4. 状态写入 Pinia（`editor` + 可选 `spineRuntime` / `live2dRuntime`）→ 视口 `requestAnimationFrame` 循环中若 `spineRuntime.playing` 则 `tick`，并 `SkeletonRenderer.draw` 与骨骼线叠加；当 `live2dRuntime.showViewport` 为 true 时用 Live2D 视口替换 canvas 绘制。
 
 ## 视口显示层
 
 - 用户可通过视口右上角「显示」条切换：网格线、世界原点、Spine **贴图**（Region）与 **网格**（Mesh）独立开关、骨骼叠加、Spine 调试线（至少开启贴图或网格之一时可用）、左上角状态信息。
+- 「贴图网格线」为 MeshAttachment 的绿色线框；「Region 边框线」为 RegionAttachment 的绿色外框线。
 - 状态持久于会话内 Pinia `viewportDisplay`；新建工程恢复默认全开（调试线关）。
 
 ## 层级与选中
@@ -51,6 +55,31 @@
 - **层级**面板按 Spine 数据展示：骨骼（树状）、插槽、皮肤、动画；条目可点击选中/再次点击取消。
 - 选中项详情在**属性**面板「选中项」区展示；骨骼在播放时随 `spineRuntime.poseRevision` 刷新。
 - 视口骨骼层对当前选中骨骼高亮（橙点外圈）；新建/重新导入清空选中。
+- 画布支持左键点击选择 Spine slot（Region/Mesh 命中测试），并与层级面板同步；选中 slot 在画布上以橙色轮廓/填充高亮。
+
+## 时间轴（Spine）
+
+- 时间轴 Dock 位于底部，支持：
+  - 播放/暂停
+  - 拖动/点击进度条寻帧（拖动时自动暂停）
+  - Tab 切换 **Dope Sheet** 与 **Curves**（当前为只读展示）
+- Dope Sheet：按动画 timelines 聚合通道行（骨骼/插槽/其它），关键帧以点/块显示；当通道过多时在内部滚动区域滚动（不撑出 Dock）。
+- Curves：对选中骨骼的 `rotation/x/y/scaleX/scaleY` 做采样曲线预览；坐标轴（t=0、v=0）始终显示；关键帧标记显示；曲线显示区域带 inset 防止边缘裁切。
+
+## 全屏与 Dock 布局
+
+- **画布全屏**：隐藏左/右/底 Dock，仅保留中心画布。
+- **显示器全屏**：仅对中心画布容器触发浏览器 Fullscreen API（不全屏整个页面）。
+- Dock 布局（可见性与尺寸）持久化到 localStorage；窗口尺寸变化时需要对已保存尺寸重新 clamp，避免挤压状态栏或溢出。
+
+## 状态栏与日志
+
+- 底部状态栏显示最近一条日志摘要；点击打开日志窗口（纯文本控制台）。
+- 日志包含信息/警告/错误：导入流程、Live2D/Spine 运行时加载、全屏切换、画布选中等；Vue 运行时错误会写入日志。
+
+## 多语言与主题
+
+- 顶部菜单支持切换语言（中文/英文）与主题（跟随系统/浅色/深色），持久化到 localStorage 并应用到 DOM（`lang` + `data-theme`）。
 
 ## 技术约束
 
