@@ -98,10 +98,26 @@ export function tryParseDbprojObject(obj: unknown, fileLabel: string): ImportRes
 }
 
 export function parseDbprojText(text: string, fileLabel: string): ImportResult {
+  const t = text.replace(/^\uFEFF/, '').trimStart()
+  // Heuristics: some editors produce binary/packed/encrypted project files.
+  // `File.text()` will still return a string, but it won't be valid JSON.
+  const head = t.slice(0, 64)
+  const hasNul = text.includes('\u0000')
+  const looksLikeZip = head.startsWith('PK') // ZIP magic
   let raw: unknown
   try {
-    raw = JSON.parse(text)
+    raw = JSON.parse(t)
   } catch {
+    if (looksLikeZip) {
+      return emptyResult([
+        `dbproj：看起来是 ZIP/压缩包（以 "PK" 开头），不是可直接解析的 JSON（${fileLabel}）。请在编辑器中导出可读的骨架 JSON（如 *_ske.json）。`,
+      ])
+    }
+    if (hasNul) {
+      return emptyResult([
+        `dbproj：检测到二进制内容（包含 NUL 字节），不是可直接解析的 JSON（${fileLabel}）。请在编辑器中导出可读的骨架 JSON（如 *_ske.json）。`,
+      ])
+    }
     return emptyResult([
       `dbproj：不是合法 JSON（${fileLabel}）。若为二进制或加密工程，请从编辑器导出 _ske.json。`,
     ])

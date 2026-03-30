@@ -396,16 +396,17 @@ function curveX(t: number, d: number): number {
       </div>
 
       <div class="tl-center">
-        <div class="tabs" role="tablist" aria-label="时间轴视图">
+        <div class="tabs" role="tablist" :aria-label="t('时间轴视图', 'Timeline view')">
           <button
             type="button"
             class="tab"
             :class="{ on: tab === 'dope' }"
             role="tab"
             :aria-selected="tab === 'dope'"
+            :aria-label="t('摄影表', 'Dope Sheet')"
             @click="tab = 'dope'"
           >
-            Dope Sheet
+            {{ t('摄影表', 'Dope Sheet') }}
           </button>
           <button
             type="button"
@@ -413,6 +414,7 @@ function curveX(t: number, d: number): number {
             :class="{ on: tab === 'curves' }"
             role="tab"
             :aria-selected="tab === 'curves'"
+            :aria-label="t('曲线', 'Curves')"
             @click="tab = 'curves'"
           >
             {{ t('曲线', 'Curves') }}
@@ -450,7 +452,11 @@ function curveX(t: number, d: number): number {
       <div v-if="hasSpine && duration > 0" class="subpanel" role="tabpanel">
         <div v-if="tab === 'dope'" class="dope">
           <div v-if="!dopeRows.length" class="muted pad">{{ t('当前动画无可显示的通道。', 'No channels to show for this animation.') }}</div>
-          <div v-else class="dope-scroll" :aria-label="t('Dope Sheet 通道与关键帧', 'Dope Sheet channels and keyframes')">
+          <div
+            v-else
+            class="dope-scroll"
+            :aria-label="t('摄影表：通道与关键帧', 'Dope Sheet: channels and keyframes')"
+          >
             <div v-for="r in dopeRows" :key="r.id" class="dope-row">
               <div class="dope-label" :title="r.label">{{ r.label }}</div>
               <div class="dope-line">

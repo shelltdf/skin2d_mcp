@@ -737,6 +737,7 @@ watch(
   flex-direction: column;
   align-items: stretch;
   max-width: min(420px, calc(100% - 16px));
+  max-height: calc(100% - 16px);
   padding: 6px 10px;
   border: 1px solid var(--win-border);
   border-radius: var(--win-radius-sm);
@@ -746,6 +747,8 @@ watch(
   font-size: 12px;
   color: var(--win-text);
   pointer-events: auto;
+  box-sizing: border-box;
+  overflow: auto;
 }
 
 .layer-bar-toggle {

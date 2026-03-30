@@ -46,6 +46,11 @@ export async function importAssetFile(file: File): Promise<ImportResult> {
     ])
   }
 
+  // dbproj: allow parser to handle non-standard prefixes/BOM/whitespace without the generic JSON shape guard
+  if (lower.endsWith('.dbproj')) {
+    return parseDbprojText(text, file.name)
+  }
+
   const shapeHint = assertTextLooksLikeJson(text, file.name)
   if (shapeHint) {
     return emptyResult([shapeHint])
@@ -61,10 +66,6 @@ export async function importAssetFile(file: File): Promise<ImportResult> {
         `“${file.name}” is not valid JSON. Ensure it is a UTF-8 text export from Spine/DragonBones/Live2D/dbproj and not truncated or mixed with binary data.`,
       ),
     ])
-  }
-
-  if (lower.endsWith('.dbproj')) {
-    return parseDbprojText(text, file.name)
   }
 
   if (isLive2dModel3Json(obj, file.name)) {

@@ -27,6 +27,11 @@ const hierarchySelection = useHierarchySelectionStore()
 const dock = useDockLayoutStore()
 const ui = useUiSettingsStore()
 const t = ui.t
+
+/** 与「全部类型」一致的 accept（扩展名为主，便于各浏览器文件类型下拉一致） */
+const ACCEPT_ALL_IMPORT =
+  '.json,.gltf,.glb,.dbproj,.atlas,.png,.jpg,.jpeg,.webp,.moc3,.zip'
+
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const formatsHelpOpen = ref(false)
 const logPanelOpen = ref(false)
@@ -36,8 +41,12 @@ const fullscreenEnabled = ref(false)
 const canvasFullscreenBeforeDisplay = ref(false)
 const shouldRestoreCanvasAfterDisplayExit = ref(false)
 const viewportFsRef = ref<HTMLElement | null>(null)
-const importTipSuppressed = ref(false)
 const importBtnRef = ref<HTMLButtonElement | null>(null)
+const importAccept = ref(ACCEPT_ALL_IMPORT)
+const importMultiple = ref(true)
+const importMode = ref<'any' | 'spine' | 'live2dZip' | 'live2dModel3' | 'dragonbones' | 'gltf'>('any')
+const importChooserOpen = ref(false)
+const importChooserRef = ref<HTMLElement | null>(null)
 const dockSnapshotBeforeCanvasFs = ref<{ left: boolean; right: boolean; bottom: boolean } | null>(null)
 
 const isResizing = ref<'left' | 'right' | 'bottom' | null>(null)
@@ -59,9 +68,59 @@ function onWindowResize() {
 function triggerImportPicker() {
   fileInputRef.value?.click()
   appLog.info(t('打开文件选择对话框', 'Open file picker'))
-  // 点击后让悬浮提示消失（避免 focus-within 让 tooltip 悬停在屏幕上）
-  importTipSuppressed.value = true
   requestAnimationFrame(() => importBtnRef.value?.blur())
+}
+
+/** 菜单「导入/打开」：先恢复全类型再在下一帧打开，避免沿用上一次的 accept */
+function openFilePickerFromMenu() {
+  importAccept.value = ACCEPT_ALL_IMPORT
+  importMultiple.value = true
+  importMode.value = 'any'
+  void nextTick(() => triggerImportPicker())
+}
+
+function triggerTypedImport(kind: typeof importMode.value) {
+  importMode.value = kind
+  if (kind === 'spine') {
+    importAccept.value = '.json,.atlas,.png,.jpg,.jpeg,.webp'
+    importMultiple.value = true
+  } else if (kind === 'live2dZip') {
+    importAccept.value = '.zip'
+    importMultiple.value = false
+  } else if (kind === 'live2dModel3') {
+    // 多数浏览器不接受「.model3.json」作为筛选项，仅用 .json；用户需自选 *.model3.json
+    importAccept.value = '.json'
+    importMultiple.value = false
+  } else if (kind === 'dragonbones') {
+    importAccept.value = '.dbproj,.json'
+    importMultiple.value = false
+  } else if (kind === 'gltf') {
+    importAccept.value = '.glb,.gltf'
+    importMultiple.value = false
+  } else {
+    importAccept.value = ACCEPT_ALL_IMPORT
+    importMultiple.value = true
+  }
+  // 必须等 Vue 把 :accept / :multiple 刷到 DOM 后再 click，否则对话框仍用旧过滤器
+  void nextTick(() => triggerImportPicker())
+}
+
+function openImportChooser() {
+  importChooserOpen.value = !importChooserOpen.value
+  requestAnimationFrame(() => importBtnRef.value?.blur())
+}
+
+function closeImportChooser() {
+  importChooserOpen.value = false
+}
+
+function onDocumentPointerDown(e: PointerEvent) {
+  if (!importChooserOpen.value) return
+  const root = importChooserRef.value
+  if (!root) return
+  const target = e.target as Node | null
+  if (target && root.contains(target)) return
+  closeImportChooser()
 }
 
 function toggleCanvasFullscreen() {
@@ -250,6 +309,7 @@ watch(
 onMounted(() => {
   document.addEventListener('keydown', onKeydown)
   document.addEventListener('fullscreenchange', onFullscreenChange)
+  document.addEventListener('pointerdown', onDocumentPointerDown)
   fullscreenEnabled.value = Boolean(document.fullscreenEnabled)
   onFullscreenChange()
   dock.loadFromStorage()
@@ -259,6 +319,7 @@ onMounted(() => {
 onUnmounted(() => {
   document.removeEventListener('keydown', onKeydown)
   document.removeEventListener('fullscreenchange', onFullscreenChange)
+  document.removeEventListener('pointerdown', onDocumentPointerDown)
   window.removeEventListener('resize', onWindowResize)
 })
 </script>
@@ -269,15 +330,15 @@ onUnmounted(() => {
       ref="fileInputRef"
       type="file"
       class="hidden"
-      multiple
-      accept=".json,.gltf,.glb,.dbproj,.atlas,.png,.jpg,.jpeg,.webp,.moc3,.zip,application/zip,image/*,application/json"
+      :multiple="importMultiple"
+      :accept="importAccept"
       @change="onFiles"
     />
 
     <AppMenuBar
-      @import="triggerImportPicker"
+      @import="openFilePickerFromMenu"
       @new-project="onNewProject"
-      @open="triggerImportPicker"
+      @open="openFilePickerFromMenu"
       @formats-help="onFormatsHelp"
     />
 
@@ -287,18 +348,14 @@ onUnmounted(() => {
     <div class="app-workspace">
       <div class="toolbar">
         <div class="tb-left">
-          <div
-            class="tb-import-wrap"
-            :class="{ tipOff: importTipSuppressed }"
-            @pointerenter="importTipSuppressed = false"
-          >
+          <div class="tb-import-wrap">
             <button
               ref="importBtnRef"
               type="button"
               class="tb-icon-btn primary"
-              title="导入"
-              aria-label="导入"
-              @click="triggerImportPicker"
+              :title="t('导入', 'Import')"
+              :aria-label="t('导入', 'Import')"
+              @click="openImportChooser"
             >
               <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
                 <path
@@ -307,18 +364,46 @@ onUnmounted(() => {
                 />
               </svg>
             </button>
-            <div class="tb-tooltip" role="tooltip" aria-hidden="true">
-              <div class="tb-tooltip-title">导入方式（每行一个格式）</div>
-              <div class="tb-tooltip-body">
-                <div class="tb-tip-line"><strong>Spine</strong>：同一次多选 <code>.json</code> + <code>.atlas</code> + 贴图</div>
-                <div class="tb-tip-line"><strong>Live2D</strong>：画布预览导入单个 <code>.zip</code>（含 <code>.model3.json</code> / <code>.moc3</code> / 贴图）</div>
-                <div class="tb-tip-line"><strong>Live2D</strong>：单个 <code>.model3.json</code> 仅元数据</div>
-                <div class="tb-tip-line"><strong>DragonBones</strong>：单文件 <code>*.dbproj</code> 或 <code>*_ske.json</code></div>
-                <div class="tb-tip-line"><strong>glTF</strong>：单文件 <code>.glb</code>（或 <code>.gltf</code>）</div>
-              </div>
+            <div v-if="importChooserOpen" ref="importChooserRef" class="tb-import-chooser" role="dialog">
+              <div class="chooser-title">{{ t('选择导入类型', 'Choose import type') }}</div>
+              <button type="button" class="chooser-item" @click="closeImportChooser(); triggerTypedImport('spine')">
+                <div class="ci-main">Spine</div>
+                <div class="ci-sub">
+                  {{ t('多选：.json + .atlas + 贴图', 'Multi-select: .json + .atlas + textures') }}
+                </div>
+              </button>
+              <button type="button" class="chooser-item" @click="closeImportChooser(); triggerTypedImport('live2dZip')">
+                <div class="ci-main">Live2D</div>
+                <div class="ci-sub">{{ t('单选：.zip（画布预览）', 'Single: .zip (canvas preview)') }}</div>
+              </button>
+              <button
+                type="button"
+                class="chooser-item"
+                @click="closeImportChooser(); triggerTypedImport('live2dModel3')"
+              >
+                <div class="ci-main">Live2D</div>
+                <div class="ci-sub">{{ t('单选：.model3.json（仅元数据）', 'Single: .model3.json (metadata only)') }}</div>
+              </button>
+              <button type="button" class="chooser-item" @click="closeImportChooser(); triggerTypedImport('dragonbones')">
+                <div class="ci-main">DragonBones</div>
+                <div class="ci-sub">{{ t('单选：.dbproj 或 *_ske.json', 'Single: .dbproj or *_ske.json') }}</div>
+              </button>
+              <button type="button" class="chooser-item" @click="closeImportChooser(); triggerTypedImport('gltf')">
+                <div class="ci-main">glTF</div>
+                <div class="ci-sub">{{ t('单选：.glb / .gltf', 'Single: .glb / .gltf') }}</div>
+              </button>
+              <button type="button" class="chooser-item" @click="closeImportChooser(); triggerTypedImport('any')">
+                <div class="ci-main">{{ t('全部类型', 'All types') }}</div>
+                <div class="ci-sub">{{ t('允许多选（自动识别）', 'Multi-select allowed (auto-detect)') }}</div>
+              </button>
+              <button type="button" class="chooser-link" @click="closeImportChooser(); onFormatsHelp()">
+                {{ t('查看支持的文件格式与导入方式…', 'View supported formats and import modes…') }}
+              </button>
             </div>
           </div>
+        </div>
 
+        <div class="tb-center" role="group" :aria-label="t('Dock 显示/隐藏', 'Dock toggles')">
           <button
             type="button"
             class="tb-icon-btn"
@@ -499,13 +584,25 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.tb-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex: 0;
 }
 
 .tb-right {
-  margin-left: auto;
   display: flex;
   align-items: center;
   gap: 6px;
+  flex: 1;
+  min-width: 0;
+  justify-content: flex-end;
 }
 
 .tb-icon-btn {
@@ -520,6 +617,70 @@ onUnmounted(() => {
   background: var(--win-surface);
   color: var(--win-text);
   cursor: pointer;
+}
+
+.tb-import-chooser {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 8px);
+  z-index: 30;
+  width: min(420px, 72vw);
+  padding: 10px;
+  border-radius: var(--win-radius-sm);
+  border: 1px solid var(--win-border);
+  background: color-mix(in srgb, var(--win-surface) 96%, transparent);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.14);
+  backdrop-filter: blur(8px);
+}
+
+.chooser-title {
+  font-weight: 800;
+  font-size: 12px;
+  color: var(--win-text);
+  margin: 0 0 8px;
+}
+
+.chooser-item {
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  cursor: pointer;
+  color: var(--win-text);
+}
+
+.chooser-item:hover {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.06);
+}
+
+.ci-main {
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.ci-sub {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--win-text-secondary);
+}
+
+.chooser-link {
+  width: 100%;
+  margin-top: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--win-border);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.02);
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--win-text);
+}
+
+.chooser-link:hover {
+  background: rgba(0, 0, 0, 0.04);
 }
 
 .tb-icon-btn:hover:not(:disabled) {
@@ -562,50 +723,6 @@ onUnmounted(() => {
   position: relative;
   display: inline-flex;
   align-items: center;
-}
-
-.tb-tooltip {
-  position: absolute;
-  left: 0;
-  top: calc(100% + 8px);
-  z-index: 20;
-  width: min(520px, 78vw);
-  padding: 10px 12px;
-  border-radius: var(--win-radius-sm);
-  border: 1px solid var(--win-border);
-  background: color-mix(in srgb, var(--win-surface) 96%, transparent);
-  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.12);
-  backdrop-filter: blur(8px);
-  font-size: 12px;
-  color: var(--win-text);
-  display: none;
-}
-
-.tb-import-wrap:hover .tb-tooltip,
-.tb-import-wrap:focus-within .tb-tooltip {
-  display: block;
-}
-
-.tb-import-wrap.tipOff:hover .tb-tooltip,
-.tb-import-wrap.tipOff:focus-within .tb-tooltip {
-  display: none;
-}
-
-.tb-tooltip-title {
-  font-weight: 700;
-  margin-bottom: 6px;
-  color: var(--win-text);
-}
-
-.tb-tooltip-body {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  color: var(--win-text-secondary);
-}
-
-.tb-tip-line strong {
-  color: var(--win-text);
 }
 
 .dock-root {
