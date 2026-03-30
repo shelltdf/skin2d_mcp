@@ -2,6 +2,7 @@ import JSZip from 'jszip'
 import type { ImportResult } from '../importers/types'
 import { emptyResult } from '../importers/types'
 import { isLive2dModel3Json, parseLive2dModel3 } from '../importers/live2d'
+import { tryGetLive2dCdi3Counts } from './cdi3FromZip'
 
 /** 从 zip 中读取首个 .model3.json 并生成 ImportResult（用于属性面板） */
 export async function extractLive2dMetaFromZip(file: File): Promise<ImportResult> {
@@ -27,9 +28,12 @@ export async function extractLive2dMetaFromZip(file: File): Promise<ImportResult
     if (!isLive2dModel3Json(obj, modelPath)) {
       return emptyResult([`「${modelPath}」不是 Live2D model3 描述。`])
     }
+    const root = obj as Record<string, unknown>
     const base = parseLive2dModel3(obj, modelPath.split(/[/\\]/).pop() ?? modelPath)
+    const cdi = await tryGetLive2dCdi3Counts(zip, modelPath, root)
     return {
       ...base,
+      ...(cdi ?? {}),
       warnings: [
         '已从 zip 解析 model3 元数据。画布预览加载完成后，右侧「提示」会自动更新为已就绪状态。',
       ],

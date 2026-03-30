@@ -12,6 +12,7 @@
   "dependencies": {
     "@esotericsoftware/spine-canvas": "4.2",
     "@esotericsoftware/spine-core": "4.2",
+    "dragonbones.js": "^5.7.4",
     "jszip": "^3.10.1",
     "pinia": "^3.0.4",
     "pixi-live2d-display": "^0.4.0",

@@ -1,11 +1,12 @@
 import JSZip from 'jszip'
+import { ZipLoader as CubismZipLoader } from './pixiCubism4'
 
-type PixiZipLoader = typeof import('pixi-live2d-display/cubism4').ZipLoader
+type PixiZipLoader = typeof CubismZipLoader
 
 /**
  * pixi-live2d-display 的 ZipLoader 默认可抛「Not implemented」；
  * 需用 JSZip 实现后方可 Live2DModel.from([zip File]).
- * 在动态 import('pixi-live2d-display/cubism4') 之后传入 ZipLoader。
+ * 在已加载 `./pixiCubism4` 后传入 ZipLoader。
  * @see https://github.com/guansss/pixi-live2d-display/wiki/Additional-Features
  */
 let done = false

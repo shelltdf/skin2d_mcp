@@ -8,7 +8,9 @@ import { drawSpineMeshAttachments, drawSpineRegionAttachments, drawSpineRegionWi
 import { useEditorStore } from '../stores/editor'
 import { useSpineRuntimeStore } from '../stores/spineRuntime'
 import { useLive2dRuntimeStore } from '../stores/live2dRuntime'
+import { useDragonbonesRuntimeStore } from '../stores/dragonbonesRuntime'
 import Live2DViewport from './Live2DViewport.vue'
+import DragonBonesViewport from './DragonBonesViewport.vue'
 import { useHierarchySelectionStore } from '../stores/hierarchySelection'
 import { useViewportDisplayStore } from '../stores/viewportDisplay'
 import { useAppLogStore } from '../stores/appLog'
@@ -17,6 +19,7 @@ import { useUiSettingsStore } from '../stores/uiSettings'
 const store = useEditorStore()
 const spineStore = useSpineRuntimeStore()
 const live2dStore = useLive2dRuntimeStore()
+const dragonbonesStore = useDragonbonesRuntimeStore()
 const display = useViewportDisplayStore()
 const hierarchySel = useHierarchySelectionStore()
 const appLog = useAppLogStore()
@@ -281,29 +284,35 @@ function drawWorldGrid(ctx: CanvasRenderingContext2D, w: number, h: number) {
   const top = cy - h / (2 * sc)
   const bottom = cy + h / (2 * sc)
 
-  let step = 50
-  const targetPx = 40
-  const raw = targetPx / sc
-  const exp = Math.floor(Math.log10(raw))
-  const base = Math.pow(10, exp)
-  const candidates = [1, 2, 5, 10].map((m) => m * base)
-  step = candidates.reduce((a, b) =>
-    Math.abs(b * sc - targetPx) < Math.abs(a * sc - targetPx) ? b : a,
-  )
+  /** 世界空间：细线步长默认 1，每 10 格一条粗线；可视范围过大时放大 minor 以免单次绘制线数爆炸 */
+  const maxLinesAxis = 3500
+  let minor = 1
+  const span = Math.max(right - left, bottom - top)
+  if (span / minor > maxLinesAxis) {
+    minor = Math.max(1, Math.ceil(span / maxLinesAxis))
+  }
 
   if (display.showGridLines) {
-    ctx.strokeStyle = 'rgba(0,0,0,0.07)'
-    ctx.lineWidth = 1
-    let x0 = Math.floor(left / step) * step
-    for (let wx = x0; wx <= right; wx += step) {
+    const i0 = Math.floor(left / minor)
+    const i1 = Math.ceil(right / minor)
+    for (let i = i0; i <= i1; i++) {
+      const wx = i * minor
+      const major = i % 10 === 0
+      ctx.strokeStyle = major ? 'rgba(0, 103, 192, 0.22)' : 'rgba(0,0,0,0.10)'
+      ctx.lineWidth = major ? 2 : 1
       const sx = w / 2 + (wx - cx) * sc
       ctx.beginPath()
       ctx.moveTo(sx + 0.5, 0)
       ctx.lineTo(sx + 0.5, h)
       ctx.stroke()
     }
-    let y0 = Math.floor(top / step) * step
-    for (let wy = y0; wy <= bottom; wy += step) {
+    const j0 = Math.floor(top / minor)
+    const j1 = Math.ceil(bottom / minor)
+    for (let j = j0; j <= j1; j++) {
+      const wy = j * minor
+      const major = j % 10 === 0
+      ctx.strokeStyle = major ? 'rgba(0, 103, 192, 0.22)' : 'rgba(0,0,0,0.10)'
+      ctx.lineWidth = major ? 2 : 1
       const sy = h / 2 + (wy - cy) * sc
       ctx.beginPath()
       ctx.moveTo(0, sy + 0.5)
@@ -312,23 +321,28 @@ function drawWorldGrid(ctx: CanvasRenderingContext2D, w: number, h: number) {
     }
   }
 
-  if (display.showWorldOrigin) {
-    ctx.strokeStyle = 'rgba(0, 103, 192, 0.28)'
-    ctx.lineWidth = 1.5
-    const o0 = worldToScreen(0, 0, w, h)
-    if (o0.x >= 0 && o0.x <= w) {
-      ctx.beginPath()
-      ctx.moveTo(o0.x, 0)
-      ctx.lineTo(o0.x, h)
-      ctx.stroke()
-    }
-    if (o0.y >= 0 && o0.y <= h) {
-      ctx.beginPath()
-      ctx.moveTo(0, o0.y)
-      ctx.lineTo(w, o0.y)
-      ctx.stroke()
-    }
-  }
+}
+
+/** 世界原点：+X 0→1 红线、+Y 0→1 绿线（世界单位）；在 draw() 末尾调用，覆盖网格/Spine/骨骼/HUD */
+function drawWorldOriginAxesOverlay(ctx: CanvasRenderingContext2D, w: number, h: number) {
+  if (!display.showWorldOrigin) return
+  const p0 = worldToScreen(0, 0, w, h)
+  const p1x = worldToScreen(1, 0, w, h)
+  const p1y = worldToScreen(0, 1, w, h)
+  ctx.save()
+  ctx.lineCap = 'round'
+  ctx.lineWidth = Math.max(1.5, 2 / Math.sqrt(viewScale.value / 4))
+  ctx.strokeStyle = 'rgba(220, 53, 69, 0.95)'
+  ctx.beginPath()
+  ctx.moveTo(p0.x, p0.y)
+  ctx.lineTo(p1x.x, p1x.y)
+  ctx.stroke()
+  ctx.strokeStyle = 'rgba(46, 160, 67, 0.95)'
+  ctx.beginPath()
+  ctx.moveTo(p0.x, p0.y)
+  ctx.lineTo(p1y.x, p1y.y)
+  ctx.stroke()
+  ctx.restore()
 }
 
 function drawSpineRig(
@@ -379,7 +393,7 @@ function drawSpineRig(
 }
 
 function draw() {
-  if (live2dStore.showViewport) return
+  if (live2dStore.showViewport || dragonbonesStore.showViewport) return
   const c = canvasRef.value
   if (!c) return
   const ctx = c.getContext('2d')
@@ -394,7 +408,8 @@ function draw() {
   ctx.fillStyle = '#ececec'
   ctx.fillRect(0, 0, w, h)
 
-  if (display.showGridLines || display.showWorldOrigin) {
+  /** 绘制顺序：底→顶 = 世界网格 → Spine 贴图与 mesh/线框/选中高亮 → 骨骼 → HUD → 世界原点（0→1 红/绿短线，始终最上层） */
+  if (display.showGridLines) {
     drawWorldGrid(ctx, w, h)
   }
 
@@ -430,7 +445,6 @@ function draw() {
     if (display.showSpineRegionWire) {
       drawSpineRegionWires(ctx, sk, { drawWire: true })
     }
-    // 选中高亮：画在贴图层之上、骨骼层之下
     drawSelectedSlotHighlight(ctx, sk)
     ctx.restore()
   }
@@ -463,10 +477,14 @@ function draw() {
       lines.push(spineStore.playing ? '动画：播放中' : '动画：已暂停')
     }
     const z = baseFitScale.value > 0 ? viewScale.value / baseFitScale.value : 1
-    lines.push(`缩放 ×${z.toFixed(2)} · 中键拖移 · 滚轮缩放 · 双击复位`)
+    lines.push(`缩放 ×${z.toFixed(2)}`)
     lines.forEach((line, i) => {
       ctx.fillText(line, 16, 24 + i * 18)
     })
+  }
+
+  if (display.showWorldOrigin) {
+    drawWorldOriginAxesOverlay(ctx, w, h)
   }
 }
 
@@ -633,11 +651,17 @@ watch(
 )
 
 watch(
+  () => dragonbonesStore.showViewport,
+  () => draw(),
+)
+
+watch(
   () => [display.showSpineTexture, display.showSpineMeshWire, display.showSpineRegionWire] as const,
   ([tex, meshWire, regionWire]) => {
     if (!tex && !meshWire && !regionWire) display.showSpineDebug = false
   },
 )
+
 </script>
 
 <template>
@@ -654,59 +678,91 @@ watch(
         <span class="chev" aria-hidden="true">{{ displayPanelOpen ? '▾' : '▸' }}</span>
       </button>
       <div v-show="displayPanelOpen" class="layer-bar-body">
-      <label class="layer-item">
-        <input v-model="display.showGridLines" type="checkbox" />
-        {{ t('坐标网格', 'Grid') }}
-      </label>
-      <label class="layer-item">
-        <input v-model="display.showWorldOrigin" type="checkbox" />
-        {{ t('世界原点', 'World origin') }}
-      </label>
-      <label class="layer-item" :class="{ disabled: !spineStore.ready }">
-        <input v-model="display.showSpineTexture" type="checkbox" :disabled="!spineStore.ready" />
-        {{ t('贴图', 'Texture') }}
-      </label>
-      <label class="layer-item" :class="{ disabled: !spineStore.ready }">
-        <input v-model="display.showSpineMeshWire" type="checkbox" :disabled="!spineStore.ready" />
-        {{ t('贴图网格线', 'Texture mesh wire') }}
-      </label>
-      <label class="layer-item" :class="{ disabled: !spineStore.ready }">
-        <input v-model="display.showSpineRegionWire" type="checkbox" :disabled="!spineStore.ready" />
-        {{ t('Region 边框线', 'Region border') }}
-      </label>
-      <label class="layer-item">
-        <input v-model="display.showBones" type="checkbox" />
-        {{ t('骨骼', 'Bones') }}
-      </label>
-      <label
-        class="layer-item"
-        :class="{
-          disabled:
-            !spineStore.ready ||
-            (!display.showSpineTexture && !display.showSpineMeshWire && !display.showSpineRegionWire),
-        }"
-      >
-        <input
-          v-model="display.showSpineDebug"
-          type="checkbox"
-          :disabled="
-            !spineStore.ready ||
-            (!display.showSpineTexture &&
-              !display.showSpineMeshWire &&
-              !display.showSpineRegionWire)
-          "
-        />
-        {{ t('Spine 调试线', 'Spine debug') }}
-      </label>
-      <label class="layer-item">
-        <input v-model="display.showHud" type="checkbox" />
-        {{ t('状态信息', 'HUD') }}
-      </label>
+        <div class="layer-section-title">{{ t('通用', 'Common') }}</div>
+          <label class="layer-item">
+            <input v-model="display.showHud" type="checkbox" />
+            {{ t('状态信息', 'HUD') }}
+          </label>
+        <label class="layer-item">
+          <input v-model="display.showGridLines" type="checkbox" />
+          {{ t('坐标网格', 'Grid') }}
+        </label>
+        <label class="layer-item">
+          <input v-model="display.showWorldOrigin" type="checkbox" />
+          {{ t('世界原点', 'World origin') }}
+        </label>
+
+        <template v-if="live2dStore.showViewport">
+          <div class="layer-section-title">Live2D</div>
+          <label class="layer-item">
+            <input v-model="display.showLive2dTexture" type="checkbox" />
+            {{ t('贴图', 'Texture') }}
+          </label>
+          <label class="layer-item">
+            <input v-model="display.showLive2dDrawableWire" type="checkbox" />
+            {{ t('Drawable 网格线', 'Drawable mesh wire') }}
+          </label>
+        </template>
+        <template v-else-if="dragonbonesStore.showViewport">
+          <div class="layer-section-title">DragonBones</div>
+          <label class="layer-item">
+            <input v-model="display.showDragonBonesTexture" type="checkbox" />
+            {{ t('贴图', 'Texture') }}
+          </label>
+          <label class="layer-item">
+            <input v-model="display.showDragonBonesBoneDebug" type="checkbox" />
+            {{ t('骨骼', 'Bones') }}
+          </label>
+          <label class="layer-item">
+            <input v-model="display.showDragonBonesMeshWire" type="checkbox" />
+            {{ t('贴图网格线', 'Texture mesh wire') }}
+          </label>
+          <label class="layer-item">
+            <input v-model="display.showDragonBonesRegionWire" type="checkbox" />
+            {{ t('Region 边框线', 'Region border') }}
+          </label>
+        </template>
+        <template v-else-if="spineStore.ready">
+          <div class="layer-section-title">{{ t('Spine', 'Spine') }}</div>
+          <label class="layer-item">
+            <input v-model="display.showSpineTexture" type="checkbox" />
+            {{ t('贴图', 'Texture') }}
+          </label>
+          <label class="layer-item">
+            <input v-model="display.showBones" type="checkbox" />
+            {{ t('骨骼', 'Bones') }}
+          </label>
+          <label class="layer-item">
+            <input v-model="display.showSpineMeshWire" type="checkbox" />
+            {{ t('贴图网格线', 'Texture mesh wire') }}
+          </label>
+          <label class="layer-item">
+            <input v-model="display.showSpineRegionWire" type="checkbox" />
+            {{ t('Region 边框线', 'Region border') }}
+          </label>
+          <label
+            class="layer-item"
+            :class="{
+              disabled:
+                !display.showSpineTexture && !display.showSpineMeshWire && !display.showSpineRegionWire,
+            }"
+          >
+            <input
+              v-model="display.showSpineDebug"
+              type="checkbox"
+              :disabled="
+                !display.showSpineTexture && !display.showSpineMeshWire && !display.showSpineRegionWire
+              "
+            />
+            {{ t('Spine 调试线', 'Spine debug') }}
+          </label>
+        </template>
       </div>
     </div>
     <Live2DViewport v-if="live2dStore.showViewport" />
+    <DragonBonesViewport v-else-if="dragonbonesStore.showViewport" :key="dragonbonesStore.mountGeneration" />
     <canvas
-      v-show="!live2dStore.showViewport"
+      v-show="!live2dStore.showViewport && !dragonbonesStore.showViewport"
       ref="canvasRef"
       class="canvas"
       @wheel.prevent="onWheel"
@@ -792,6 +848,14 @@ watch(
   align-items: flex-start;
   gap: 6px;
   margin-top: 4px;
+}
+
+.layer-section-title {
+  font-size: 11px;
+  letter-spacing: 0.3px;
+  color: rgba(0, 0, 0, 0.55);
+  text-transform: uppercase;
+  margin-top: 2px;
 }
 
 .layer-item {

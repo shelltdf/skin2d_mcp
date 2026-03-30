@@ -72,6 +72,17 @@ const formatSummary = computed(() => {
   return parts.join(' · ')
 })
 
+const showLive2dCounts = computed(() => {
+  const r = store.lastImport
+  if (!r || r.formatId !== 'live2d') return false
+  return (
+    r.live2dParameterCount != null ||
+    r.live2dPartCount != null ||
+    r.slotCount != null ||
+    (r.animationNames?.length ?? 0) > 0
+  )
+})
+
 function isSlotSel(name: string) {
   return hierarchy.selected?.kind === 'slot' && hierarchy.selected.name === name
 }
@@ -92,7 +103,30 @@ function isAnimSel(name: string) {
       <p v-if="hint" class="hint">{{ hint }}</p>
       <template v-else>
         <p class="meta">{{ formatSummary }}</p>
-        <p v-if="store.lastImport?.boneCount != null" class="counts">
+        <p v-if="showLive2dCounts" class="counts">
+          <template v-if="store.lastImport!.live2dParameterCount != null">
+            {{ t('参数', 'Parameters') }} {{ store.lastImport!.live2dParameterCount }}
+          </template>
+          <template v-if="store.lastImport!.live2dPartCount != null">
+            <template v-if="store.lastImport!.live2dParameterCount != null"> · </template>
+            {{ t('部件', 'Parts') }} {{ store.lastImport!.live2dPartCount }}
+          </template>
+          <template v-if="store.lastImport!.slotCount != null">
+            <template
+              v-if="
+                store.lastImport!.live2dParameterCount != null ||
+                store.lastImport!.live2dPartCount != null
+              "
+            >
+              ·
+            </template>
+            {{ t('贴图页', 'Texture pages') }} {{ store.lastImport!.slotCount }}
+          </template>
+          <template v-if="(store.lastImport!.animationNames?.length ?? 0) > 0">
+            · {{ t('动画', 'Animations') }} {{ store.lastImport!.animationNames!.length }}
+          </template>
+        </p>
+        <p v-else-if="store.lastImport?.boneCount != null" class="counts">
           {{ t('骨骼', 'Bones') }} {{ store.lastImport.boneCount }}
           <template v-if="store.lastImport.slotCount != null"> · {{ t('插槽', 'Slots') }} {{ store.lastImport.slotCount }}</template>
           <template v-if="store.lastImport.skinCount != null"> · {{ t('皮肤', 'Skins') }} {{ store.lastImport.skinCount }}</template>

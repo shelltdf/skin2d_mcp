@@ -13,11 +13,15 @@ export interface ImportResult {
   versionHint?: string
   skeletonName?: string
   boneCount?: number
+  /** Live2D：来自 cdi3.json 的参数量（与 Spine「骨骼」不同语义） */
+  live2dParameterCount?: number
+  /** Live2D：来自 cdi3.json 的部件数 */
+  live2dPartCount?: number
   slotCount?: number
   skinCount?: number
   animationNames?: string[]
   warnings: string[]
-  /** 有则视口绘制骨骼线（当前 Spine 导入会填充） */
+  /** 有则视口绘制骨骼线（Spine / DragonBones 骨架 JSON 会填充） */
   rigPreview?: { bones: RigPreviewBone[] }
 }
 

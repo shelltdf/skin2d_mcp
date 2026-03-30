@@ -178,24 +178,23 @@ onUnmounted(() => {
 
           <section>
             <h3>
-              {{ t('DragonBones 骨架 JSON', 'DragonBones skeleton JSON') }}（{{ t('如', 'e.g.') }} <code>*_ske.json</code>）
+              {{ t('DragonBones（运行时）', 'DragonBones (runtime)') }}（<code>*_ske.json</code> / <code>*_tex.json</code>）
               <span class="badges-row" :aria-label="t('导入方式', 'Import modes')">
-                <span class="badge badge-single">{{ t('单文件', 'Single') }}</span>
+                <span class="badge badge-single">{{ t('单 ske：骨骼线', 'Single ske: bone wireframe') }}</span>
+                <span class="badge badge-zip">{{ t('多选：画布 + 动画', 'Multi: canvas + animation') }}</span>
                 <span class="badge badge-nodir">{{ t('非目录', 'No folder') }}</span>
               </span>
             </h3>
             <ul>
-              <li><strong>{{ t('内容', 'Content') }}</strong>：{{ t('运行时骨架数据，根节点通常含 armature 数组。', 'Runtime rig data; root usually contains an armature array.') }}</li>
-              <li><strong>{{ t('版本', 'Version') }}</strong>：{{ t('DragonBones 有 4.x、5.5 等多套 JSON 约定；字段随版本演变。', 'DragonBones has multiple JSON schemas (4.x, 5.5, etc.); fields evolve across versions.') }}</li>
-              <li><strong>{{ t('兼容性', 'Compatibility') }}</strong>：{{ t('请尽量使用与目标引擎 / 官方文档一致的导出版本；过旧或过新的 JSON 可能出现统计字段缺失或解析告警。', 'Export with a version matching your target engine/docs; too old/new JSON may miss fields or trigger warnings.') }}</li>
-              <li>
-                <strong>{{ t('贴图', 'Textures') }}</strong>：{{
-                  t(
-                    '*_tex.json / 图集需与工程配套；本工具导入骨架 JSON 时不自动加载贴图，也不支持在同一次导入里附带多选贴图（仅解析该 ske JSON）。',
-                    'Texture atlas (*_tex.json) must match the project. This tool does not auto-load textures when importing the skeleton JSON, and does not support multi-selecting textures together (it parses only the ske JSON).',
-                  )
-                }}
-              </li>
+              <li><strong>{{ t('内容', 'Content') }}</strong>：{{ t('运行时骨架 JSON 根节点含 armature；纹理描述在独立的 *_tex.json，并由 PNG/WebP 图集提供像素。', 'Runtime ske JSON contains armature at root; *_tex.json describes atlas pages backed by PNG/WebP images.') }}</li>
+              <li><strong>{{ t('完整预览', 'Full preview') }}</strong>：{{
+                t(
+                  '与 Spine 类似：在同一导入对话框中**多选** *_ske.json、*_tex.json 及图集贴图（imagePath 指向的文件名需一致）。将使用 pixi.js + dragonbones.js 在 WebGL 画布中渲染并可在此播放动画。摄影表/曲线仍仅 Spine 支持。',
+                  'Like Spine: **multi-select** *_ske.json, *_tex.json, and atlas images in one picker (imagePath must match). Renders on WebGL via pixi.js + dragonbones.js with timeline play/pause and scrub. Dope sheet and curves remain Spine-only.',
+                )
+              }}</li>
+              <li><strong>{{ t('仅骨架', 'Ske only') }}</strong>：{{ t('只选 *_ske.json 时仍仅解析元数据并显示骨骼连线（无贴图/无运行时）。', 'Importing only *_ske.json shows metadata + bone lines (no textures / no DB runtime).') }}</li>
+              <li><strong>{{ t('版本', 'Version') }}</strong>：{{ t('DragonBones 有 4.x、5.5 等多套 JSON 约定；若导出与 dragonbones.js 5.7 不兼容可能加载失败，请反馈样本（脱敏）。', 'DragonBones has multiple JSON schemas; if incompatible with dragonbones.js 5.7, loading may fail — share a sanitized sample.') }}</li>
             </ul>
           </section>
 

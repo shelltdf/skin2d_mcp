@@ -9,9 +9,12 @@ import HierarchyPanel from './components/HierarchyPanel.vue'
 import PropertyPanel from './components/PropertyPanel.vue'
 import TimelinePanel from './components/TimelinePanel.vue'
 import { importAssetFile } from './importers'
+import type { ImportPickerKind } from './lib/nativeImportPicker'
+import { tryPickImportFiles } from './lib/nativeImportPicker'
 import { useAppLogStore } from './stores/appLog'
 import { useEditorStore } from './stores/editor'
 import { useLive2dRuntimeStore } from './stores/live2dRuntime'
+import { useDragonbonesRuntimeStore } from './stores/dragonbonesRuntime'
 import { useSpineRuntimeStore } from './stores/spineRuntime'
 import { useHierarchySelectionStore } from './stores/hierarchySelection'
 import { useViewportDisplayStore } from './stores/viewportDisplay'
@@ -21,6 +24,7 @@ import { useUiSettingsStore } from './stores/uiSettings'
 const appLog = useAppLogStore()
 const store = useEditorStore()
 const live2dStore = useLive2dRuntimeStore()
+const dragonbonesStore = useDragonbonesRuntimeStore()
 const spineStore = useSpineRuntimeStore()
 const viewportDisplay = useViewportDisplayStore()
 const hierarchySelection = useHierarchySelectionStore()
@@ -32,7 +36,12 @@ const t = ui.t
 const ACCEPT_ALL_IMPORT =
   '.json,.gltf,.glb,.atlas,.png,.jpg,.jpeg,.webp,.moc3,.zip'
 
-const fileInputRef = ref<HTMLInputElement | null>(null)
+/** 各导入类型独立 `<input>`，便于浏览器分别记忆上次打开目录（回退路径） */
+const fileInputAny = ref<HTMLInputElement | null>(null)
+const fileInputSpine = ref<HTMLInputElement | null>(null)
+const fileInputLive2dZip = ref<HTMLInputElement | null>(null)
+const fileInputDragonbones = ref<HTMLInputElement | null>(null)
+const fileInputGltf = ref<HTMLInputElement | null>(null)
 const formatsHelpOpen = ref(false)
 const logPanelOpen = ref(false)
 const canvasFullscreen = ref(false)
@@ -42,9 +51,6 @@ const canvasFullscreenBeforeDisplay = ref(false)
 const shouldRestoreCanvasAfterDisplayExit = ref(false)
 const viewportFsRef = ref<HTMLElement | null>(null)
 const importBtnRef = ref<HTMLButtonElement | null>(null)
-const importAccept = ref(ACCEPT_ALL_IMPORT)
-const importMultiple = ref(true)
-const importMode = ref<'any' | 'spine' | 'live2dZip' | 'dragonbones' | 'gltf'>('any')
 const importChooserOpen = ref(false)
 const importChooserRef = ref<HTMLElement | null>(null)
 const dockSnapshotBeforeCanvasFs = ref<{ left: boolean; right: boolean; bottom: boolean } | null>(null)
@@ -65,40 +71,51 @@ function onWindowResize() {
   dock.setRightWidth(dock.rightWidth)
 }
 
-function triggerImportPicker() {
-  fileInputRef.value?.click()
-  appLog.info(t('打开文件选择对话框', 'Open file picker'))
+function fallbackFileInput(kind: ImportPickerKind): HTMLInputElement | null {
+  switch (kind) {
+    case 'any':
+      return fileInputAny.value
+    case 'spine':
+      return fileInputSpine.value
+    case 'live2dZip':
+      return fileInputLive2dZip.value
+    case 'dragonbones':
+      return fileInputDragonbones.value
+    case 'gltf':
+      return fileInputGltf.value
+    default:
+      return fileInputAny.value
+  }
+}
+
+/**
+ * 优先 `showOpenFilePicker`（按类型不同 `id` 记目录）；否则点击对应独立 file input。
+ */
+async function openImportWithKind(kind: ImportPickerKind) {
+  const picked = await tryPickImportFiles(kind)
+  if (picked.outcome === 'cancelled') return
+  if (picked.outcome === 'picked') {
+    await processImportFiles(picked.files)
+    requestAnimationFrame(() => importBtnRef.value?.blur())
+    return
+  }
+  await nextTick()
+  const input = fallbackFileInput(kind)
+  if (input) {
+    input.click()
+    appLog.info(t('打开文件选择对话框', 'Open file picker'))
+  }
   requestAnimationFrame(() => importBtnRef.value?.blur())
 }
 
-/** 菜单「导入/打开」：先恢复全类型再在下一帧打开，避免沿用上一次的 accept */
+/** 菜单「导入 / 打开」：全类型 */
 function openFilePickerFromMenu() {
-  importAccept.value = ACCEPT_ALL_IMPORT
-  importMultiple.value = true
-  importMode.value = 'any'
-  void nextTick(() => triggerImportPicker())
+  void openImportWithKind('any')
 }
 
-function triggerTypedImport(kind: typeof importMode.value) {
-  importMode.value = kind
-  if (kind === 'spine') {
-    importAccept.value = '.json,.atlas,.png,.jpg,.jpeg,.webp'
-    importMultiple.value = true
-  } else if (kind === 'live2dZip') {
-    importAccept.value = '.zip'
-    importMultiple.value = false
-  } else if (kind === 'dragonbones') {
-    importAccept.value = '.json'
-    importMultiple.value = false
-  } else if (kind === 'gltf') {
-    importAccept.value = '.glb,.gltf'
-    importMultiple.value = false
-  } else {
-    importAccept.value = ACCEPT_ALL_IMPORT
-    importMultiple.value = true
-  }
-  // 必须等 Vue 把 :accept / :multiple 刷到 DOM 后再 click，否则对话框仍用旧过滤器
-  void nextTick(() => triggerImportPicker())
+async function triggerTypedImport(kind: ImportPickerKind) {
+  importChooserOpen.value = false
+  await openImportWithKind(kind)
 }
 
 function openImportChooser() {
@@ -217,16 +234,14 @@ function onFormatsHelp() {
 function onNewProject() {
   spineStore.dispose()
   live2dStore.dispose()
+  dragonbonesStore.dispose()
   viewportDisplay.resetToDefaults()
   hierarchySelection.clear()
   store.setImportResult(null, null, null)
   appLog.info(t('新建工程：已清空导入与运行时', 'New project: cleared import and runtimes'))
 }
 
-async function onFiles(e: Event) {
-  const input = e.target as HTMLInputElement
-  const files = Array.from(input.files ?? [])
-  input.value = ''
+async function processImportFiles(files: File[]) {
   if (!files.length) return
 
   const names = files.map((f) => f.name).join(', ')
@@ -234,6 +249,7 @@ async function onFiles(e: Event) {
 
   spineStore.dispose()
   live2dStore.dispose()
+  dragonbonesStore.dispose()
   hierarchySelection.clear()
   store.setImportResult(null, null, null)
 
@@ -246,14 +262,13 @@ async function onFiles(e: Event) {
     }
 
     if (files.length >= 2) {
-      const ok = await spineStore.loadFromFiles(files)
-      if (ok) return
-      if (spineStore.loadError) {
-        store.setImportResult(
-          files.map((f) => f.name).join(', '),
-          null,
-          spineStore.loadError,
-        )
+      const spineOk = await spineStore.loadFromFiles(files)
+      if (spineOk) return
+      const dbOk = await dragonbonesStore.loadFromFiles(files)
+      if (dbOk) return
+      const err = spineStore.loadError ?? dragonbonesStore.loadError
+      if (err) {
+        store.setImportResult(files.map((f) => f.name).join(', '), null, err)
         return
       }
     }
@@ -272,6 +287,13 @@ async function onFiles(e: Event) {
     store.setImportResult(name, null, msg)
     appLog.error(t('导入异常', 'Import failed'), msg)
   }
+}
+
+async function onFiles(e: Event) {
+  const input = e.target as HTMLInputElement
+  const files = Array.from(input.files ?? [])
+  input.value = ''
+  await processImportFiles(files)
 }
 
 watch(
@@ -322,14 +344,25 @@ onUnmounted(() => {
 
 <template>
   <div class="app-root" :class="{ fullscreen: canvasFullscreen }">
+    <input ref="fileInputAny" type="file" class="hidden" multiple :accept="ACCEPT_ALL_IMPORT" @change="onFiles" />
     <input
-      ref="fileInputRef"
+      ref="fileInputSpine"
       type="file"
       class="hidden"
-      :multiple="importMultiple"
-      :accept="importAccept"
+      multiple
+      accept=".json,.atlas,.png,.jpg,.jpeg,.webp"
       @change="onFiles"
     />
+    <input ref="fileInputLive2dZip" type="file" class="hidden" accept=".zip" @change="onFiles" />
+    <input
+      ref="fileInputDragonbones"
+      type="file"
+      class="hidden"
+      multiple
+      accept=".json,.png,.jpg,.jpeg,.webp"
+      @change="onFiles"
+    />
+    <input ref="fileInputGltf" type="file" class="hidden" accept=".glb,.gltf" @change="onFiles" />
 
     <AppMenuBar
       @import="openFilePickerFromMenu"
@@ -362,27 +395,30 @@ onUnmounted(() => {
             </button>
             <div v-if="importChooserOpen" ref="importChooserRef" class="tb-import-chooser" role="dialog">
               <div class="chooser-title">{{ t('选择导入类型', 'Choose import type') }}</div>
-              <button type="button" class="chooser-item" @click="closeImportChooser(); triggerTypedImport('spine')">
+              <button type="button" class="chooser-item" @click="void triggerTypedImport('spine')">
                 <div class="ci-main">Spine</div>
                 <div class="ci-sub">
                   {{ t('多选：.json + .atlas + 贴图', 'Multi-select: .json + .atlas + textures') }}
                 </div>
               </button>
-              <button type="button" class="chooser-item" @click="closeImportChooser(); triggerTypedImport('live2dZip')">
+              <button type="button" class="chooser-item" @click="void triggerTypedImport('live2dZip')">
                 <div class="ci-main">Live2D</div>
                 <div class="ci-sub">{{ t('单选：.zip（画布预览）', 'Single: .zip (canvas preview)') }}</div>
               </button>
-              <button type="button" class="chooser-item" @click="closeImportChooser(); triggerTypedImport('dragonbones')">
+              <button type="button" class="chooser-item" @click="void triggerTypedImport('dragonbones')">
                 <div class="ci-main">DragonBones</div>
                 <div class="ci-sub">{{
-                  t('单选：*_ske.json 等 DragonBones 骨架 JSON', 'Single: DragonBones skeleton JSON (e.g. *_ske.json)')
+                  t(
+                    '多选：*_ske.json + *_tex.json + 图集 PNG（参考 Spine 一次选全）',
+                    'Multi-select: *_ske.json + *_tex.json + atlas PNG (like Spine full import)',
+                  )
                 }}</div>
               </button>
-              <button type="button" class="chooser-item" @click="closeImportChooser(); triggerTypedImport('gltf')">
+              <button type="button" class="chooser-item" @click="void triggerTypedImport('gltf')">
                 <div class="ci-main">glTF</div>
                 <div class="ci-sub">{{ t('单选：.glb / .gltf', 'Single: .glb / .gltf') }}</div>
               </button>
-              <button type="button" class="chooser-item" @click="closeImportChooser(); triggerTypedImport('any')">
+              <button type="button" class="chooser-item" @click="void triggerTypedImport('any')">
                 <div class="ci-main">{{ t('全部类型', 'All types') }}</div>
                 <div class="ci-sub">{{ t('允许多选（自动识别）', 'Multi-select allowed (auto-detect)') }}</div>
               </button>

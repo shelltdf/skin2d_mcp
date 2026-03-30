@@ -16,6 +16,12 @@
 - `mountInto` 内动态导入 `pixi-live2d-display/cubism4`，并用 **`registerPixiZipLoader.ts` + `jszip`** 实现 `ZipLoader` 静态方法（否则 `Live2DModel.from([zip])` 抛「Not implemented」）。
 - 成功/失败均回写 Pinia **`editor`**（`setImportResult`），与 Spine 多文件导入一致。
 
+## DragonBones 多文件（并行路径）
+
+- **不**经过单文件 `importAssetFile`。`App.vue` 在多选且 **Spine 整包**（json+atlas）探测失败后，尝试 `dragonbonesRuntime.loadFromFiles`：`dbBundleLoader.tryLoadDragonBonesArmature` 解析 ske/tex + 图，`pixiDragonBonesEnv` 挂载全局 `PIXI` 与 `TARGET_FPMS` 后 **`dragonbones.js` / `PixiFactory`** 构建 `PixiArmatureDisplay`。
+- `DragonBonesViewport` 内 `Application` + `viewRoot` 相机层适配/平移/缩放（与 Live2D 视口交互一致）；**时间轴**可 `play/stop`、`seek`（摄影表/曲线仍仅 Spine）。
+- 成功回写 **Pinia `editor`**；dispose 时 `PixiFactory.factory.clear` 释放数据（与 Spine / Live2D 切换互不共用工厂单例外，需在 App 层先 `dispose` 各运行时）。
+
 ## 输出
 
 - 轻量/元数据导入：写入 Pinia **`editor`**（`lastImport`、`lastFileName` 等；源码 `skin2d-editor/src/stores/editor.ts`）。

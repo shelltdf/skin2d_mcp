@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useLive2dRuntimeStore } from '../stores/live2dRuntime'
+import { useDragonbonesRuntimeStore } from '../stores/dragonbonesRuntime'
 import { useEditorStore } from '../stores/editor'
 import { useViewportDisplayStore } from '../stores/viewportDisplay'
 import { useUiSettingsStore } from '../stores/uiSettings'
 
-const live2d = useLive2dRuntimeStore()
-const { live2dZoomMul, ready: live2dReady } = storeToRefs(live2d)
+const db = useDragonbonesRuntimeStore()
+const { playing: dbPlaying, userZoomMul: dbUserZoom } = storeToRefs(db)
 const editor = useEditorStore()
 const display = useViewportDisplayStore()
 const ui = useUiSettingsStore()
@@ -32,23 +32,18 @@ const hudLines = computed(() => {
     if (imp.skeletonName) {
       lines.push(`${t('骨架', 'Skeleton')}: ${imp.skeletonName}`)
     }
-    if (imp.live2dParameterCount != null) {
-      lines.push(`${t('参数（Cubism）', 'Parameters (Cubism)')}: ${imp.live2dParameterCount}`)
-    }
-    if (imp.live2dPartCount != null) {
-      lines.push(`${t('部件（Cubism）', 'Parts (Cubism)')}: ${imp.live2dPartCount}`)
+    if (imp.boneCount != null) {
+      lines.push(`${t('骨骼数', 'Bones')}: ${imp.boneCount}`)
     }
   }
-  if (live2dReady.value) {
-    lines.push(t('Live2D：预览就绪', 'Live2D: preview ready'))
-  }
-  lines.push(`${t('缩放', 'Zoom')} ×${live2dZoomMul.value.toFixed(2)}`)
+  lines.push(dbPlaying.value ? t('动画：播放中', 'Animation: playing') : t('动画：已暂停', 'Animation: paused'))
+  lines.push(`${t('缩放', 'Zoom')} ×${dbUserZoom.value.toFixed(2)}`)
   return lines
 })
 
 function onWheel(e: WheelEvent) {
   if (!el.value) return
-  live2d.live2dOnWheel(e)
+  db.dbOnWheel(e)
 }
 
 function onPointerDown(e: PointerEvent) {
@@ -70,7 +65,7 @@ function onPointerMove(e: PointerEvent) {
   const dy = e.clientY - lastPanY
   lastPanX = e.clientX
   lastPanY = e.clientY
-  live2d.live2dOnPanDelta(dx, dy)
+  db.dbOnPanDelta(dx, dy)
 }
 
 function onPointerUp(e: PointerEvent) {
@@ -90,41 +85,31 @@ function onPointerUp(e: PointerEvent) {
 
 function onDblClick(e: MouseEvent) {
   e.preventDefault()
-  live2d.live2dResetView()
+  db.dbResetView()
 }
 
 onMounted(async () => {
   if (!el.value) return
-  await live2d.mountInto(el.value)
+  await db.mountInto(el.value)
 })
 
 watch(
-  () => [display.showLive2dTexture, display.showLive2dDrawableWire, live2d.ready] as const,
-  ([tex, wire, r]) => {
-    if (!r) return
-    live2d.applyLive2dViewportDisplay(tex, wire)
-  },
-  { immediate: true },
-)
-
-watch(
-  () => [display.showGridLines, display.showWorldOrigin, live2d.ready] as const,
-  ([g, o, r]) => {
-    if (!r) return
-    live2d.setWorldOverlayVisible(g, o)
+  () => [display.showGridLines, display.showWorldOrigin] as const,
+  ([g, o]) => {
+    db.setWorldOverlayVisible(g, o)
   },
   { immediate: true },
 )
 
 onUnmounted(() => {
-  live2d.dispose()
+  db.unmount()
 })
 </script>
 
 <template>
-  <div class="live2d-root">
+  <div class="db-root">
     <div
-      class="live2d-stack"
+      class="db-stack"
       @wheel.capture.prevent="onWheel"
       @pointerdown="onPointerDown"
       @pointermove="onPointerMove"
@@ -132,50 +117,35 @@ onUnmounted(() => {
       @pointercancel="onPointerUp"
       @dblclick.prevent="onDblClick"
     >
-      <div ref="el" class="live2d-canvas-host" />
+      <div ref="el" class="db-canvas-host" />
     </div>
-    <p v-if="live2d.pendingZip && !live2d.ready && !live2d.loadError" class="live2d-loading">
-      {{ t('正在加载 Live2D…', 'Loading Live2D…') }}
-    </p>
-    <div v-if="display.showHud && hudLines.length" class="live2d-hud">
+    <div v-if="display.showHud && hudLines.length" class="db-hud">
       <p v-for="(line, i) in hudLines" :key="i">{{ line }}</p>
     </div>
   </div>
 </template>
 
 <style scoped>
-.live2d-root {
+.db-root {
   position: absolute;
   inset: 0;
   z-index: 1;
   background: #ececec;
 }
 
-.live2d-stack {
+.db-stack {
   position: absolute;
   inset: 0;
   isolation: isolate;
 }
 
-.live2d-canvas-host {
+.db-canvas-host {
   position: absolute;
   inset: 0;
   z-index: 0;
 }
 
-.live2d-loading {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  margin: 0;
-  font-size: 13px;
-  color: var(--win-text-secondary);
-  pointer-events: none;
-  z-index: 4;
-}
-
-.live2d-hud {
+.db-hud {
   position: absolute;
   left: 16px;
   top: 12px;
@@ -189,7 +159,7 @@ onUnmounted(() => {
   z-index: 10;
 }
 
-.live2d-hud p {
+.db-hud p {
   margin: 0 0 2px;
 }
 </style>

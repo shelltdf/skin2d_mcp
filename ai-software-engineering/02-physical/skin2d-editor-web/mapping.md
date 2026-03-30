@@ -20,7 +20,12 @@
 | Live2D zip 元数据提取 | `skin2d-editor/src/live2d/extractZipModel3.ts` |
 | Live2D 运行时（JSZip 注册 ZipLoader + pixi-live2d-display） | `skin2d-editor/src/stores/live2dRuntime.ts`、`skin2d-editor/src/live2d/registerPixiZipLoader.ts` |
 | Live2D 视口挂载 | `skin2d-editor/src/components/Live2DViewport.vue` |
-| DragonBones 解析 | `skin2d-editor/src/importers/dragonbones.ts` |
+| Live2D 贴图 / drawable 线框 / 世界网格与原点（`showLive2dTexture`、`showLive2dDrawableWire`、`showGridLines`/`showWorldOrigin`） | `skin2d-editor/src/stores/live2dRuntime.ts`（`applyLive2dViewportDisplay`、`setWorldOverlayVisible`、`boneOverlayG`、`gridG`、`originG`）、`Live2DViewport.vue` |
+| DragonBones 世界网格与原点（`gridG` / `originG`、`tickerSync` 末尾置顶） | `skin2d-editor/src/stores/dragonbonesRuntime.ts`、`DragonBonesViewport.vue` |
+| Spine 主 canvas 世界网格 / 原点轴（最后绘制） | `skin2d-editor/src/components/EditorViewport.vue`（`drawWorldGrid`、`drawWorldOriginAxesOverlay`） |
+| DragonBones 解析（轻量 JSON） | `skin2d-editor/src/importers/dragonbones.ts` |
+| DragonBones 多文件打包加载（Pixi + dragonbones.js） | `skin2d-editor/src/dragonbones/dbBundleLoader.ts`、`skin2d-editor/src/dragonbones/pixiDragonBonesEnv.ts` |
+| DragonBones 运行时（Pinia + 视口挂载） | `skin2d-editor/src/stores/dragonbonesRuntime.ts`、`skin2d-editor/src/components/DragonBonesViewport.vue` |
 | glTF 摘要 | `skin2d-editor/src/importers/gltf.ts` |
 | 状态 | `skin2d-editor/src/stores/editor.ts` |
 | 视口显示层开关 | `skin2d-editor/src/stores/viewportDisplay.ts` |

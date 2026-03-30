@@ -4,7 +4,7 @@
 
 - **壳层**：Vue 3 单页应用（Vite 构建），组件化布局模拟 Windows 桌面应用分区。
 - **状态**：Pinia 管理当前工程、选中节点、导入解析结果摘要。
-- **视口**：HTML5 Canvas 或 WebGL（后续）承载绘制；MVP 可为占位画布与网格线。
+- **视口**：主流程为 Spine 的 2D Canvas 与 Live2D/DragonBones 的 WebGL（Pixi）；含可选世界网格与 **世界原点短轴**（+X/+Y 各 0→1 单位，红/绿），详见逻辑/物理层视口文档。
 - **导入子系统**：按格式分模块（Spine JSON、DragonBones、glTF 等），统一输出内部 `ImportedRigSummary`（见物理规格）。
 
 ## 模块

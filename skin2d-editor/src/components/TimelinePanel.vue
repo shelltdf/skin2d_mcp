@@ -2,22 +2,106 @@
 import { computed, ref } from 'vue'
 import { MixBlend, MixDirection, Physics, Skeleton } from '@esotericsoftware/spine-core'
 import { useSpineRuntimeStore } from '../stores/spineRuntime'
+import { useDragonbonesRuntimeStore } from '../stores/dragonbonesRuntime'
+import { useLive2dRuntimeStore } from '../stores/live2dRuntime'
 import { useHierarchySelectionStore } from '../stores/hierarchySelection'
 import { useUiSettingsStore } from '../stores/uiSettings'
 
 const spine = useSpineRuntimeStore()
+const db = useDragonbonesRuntimeStore()
+const live2d = useLive2dRuntimeStore()
 const hierarchy = useHierarchySelectionStore()
 const ui = useUiSettingsStore()
 const t = ui.t
 
-const hasSpine = computed(() => spine.ready)
-const duration = computed(() => spine.currentDuration)
-const time = computed(() => spine.currentTime)
+type TimelineSource = 'spine' | 'db' | 'live2d'
+
+const timelineSource = computed<TimelineSource | null>(() => {
+  if (spine.ready) return 'spine'
+  if (db.ready) return 'db'
+  if (live2d.ready) return 'live2d'
+  return null
+})
+
+const useSpineTimeline = computed(() => timelineSource.value === 'spine')
+const hasTimeline = computed(() => timelineSource.value !== null)
+
+const duration = computed(() => {
+  switch (timelineSource.value) {
+    case 'spine':
+      return spine.currentDuration
+    case 'db':
+      return db.currentDuration
+    case 'live2d':
+      return live2d.currentDuration
+    default:
+      return 0
+  }
+})
+
+const time = computed(() => {
+  switch (timelineSource.value) {
+    case 'spine':
+      return spine.currentTime
+    case 'db':
+      return db.currentTime
+    case 'live2d':
+      return live2d.currentTime
+    default:
+      return 0
+  }
+})
 const progress = computed(() => {
   const d = duration.value || 0
   if (d <= 0) return 0
   return Math.max(0, Math.min(1, time.value / d))
 })
+
+const timelineAnimOptions = computed(() => {
+  const src = timelineSource.value
+  if (src === 'spine') return spine.animationNames.map((n) => ({ value: n, label: n }))
+  if (src === 'db') return db.animationNames.map((n) => ({ value: n, label: n }))
+  if (src === 'live2d') return live2d.motionOptions.map((o) => ({ value: o.id, label: o.label }))
+  return []
+})
+
+const timelineAnimKey = computed(() => {
+  switch (timelineSource.value) {
+    case 'spine':
+      return spine.currentAnimation ?? ''
+    case 'db':
+      return db.currentAnimation ?? ''
+    case 'live2d':
+      return live2d.currentMotionId ?? ''
+    default:
+      return ''
+  }
+})
+
+const timelinePlaying = computed(() => {
+  switch (timelineSource.value) {
+    case 'spine':
+      return spine.playing
+    case 'db':
+      return db.playing
+    case 'live2d':
+      return live2d.playing
+    default:
+      return false
+  }
+})
+
+function togglePlayAny() {
+  if (spine.ready) spine.togglePlay()
+  else if (db.ready) db.togglePlay()
+  else if (live2d.ready) live2d.togglePlay()
+}
+
+function seekOnly(sec: number) {
+  if (spine.ready) spine.seek(sec)
+  else if (db.ready) db.seek(sec)
+  else if (live2d.ready) live2d.seek(sec)
+}
 
 function fmt(v: number) {
   if (!Number.isFinite(v)) return '0.00'
@@ -26,38 +110,49 @@ function fmt(v: number) {
 
 function onAnimChange(e: Event) {
   const v = (e.target as HTMLSelectElement).value
-  if (v) spine.setAnimation(v, true)
+  if (!v) return
+  if (spine.ready) spine.setAnimation(v, true)
+  else if (db.ready) db.setAnimation(v, true)
+  else if (live2d.ready) void live2d.setMotion(v, true)
 }
 
 function onSeek(e: MouseEvent) {
-  if (!hasSpine.value) return
+  if (!hasTimeline.value) return
   const d = duration.value || 0
   if (d <= 0) return
   const el = e.currentTarget as HTMLDivElement
   const r = el.getBoundingClientRect()
   const x = Math.max(0, Math.min(1, (e.clientX - r.left) / Math.max(1, r.width)))
-  spine.seek(x * d)
+  const t = x * d
+  if (spine.ready) spine.seek(t)
+  else if (db.ready) db.seek(t)
+  else if (live2d.ready) live2d.seek(t)
 }
 
 const isScrubbing = ref(false)
 let scrubPointerId = -1
 
 function scrubAtEvent(e: PointerEvent) {
-  if (!hasSpine.value) return
+  if (!hasTimeline.value) return
   const d = duration.value || 0
   if (d <= 0) return
   const el = e.currentTarget as HTMLDivElement
   const r = el.getBoundingClientRect()
   const x = Math.max(0, Math.min(1, (e.clientX - r.left) / Math.max(1, r.width)))
-  spine.seek(x * d)
+  const t = x * d
+  if (spine.ready) spine.seek(t)
+  else if (db.ready) db.seek(t)
+  else if (live2d.ready) live2d.seek(t)
 }
 
 function onTrackPointerDown(e: PointerEvent) {
   if (e.button !== 0) return
-  if (!hasSpine.value) return
+  if (!hasTimeline.value) return
   e.preventDefault()
   // 拖动寻帧：自动暂停播放，方便精确定位
-  if (spine.playing) spine.togglePlay()
+  if (spine.ready && spine.playing) spine.togglePlay()
+  else if (db.ready && db.playing) db.togglePlay()
+  else if (live2d.ready && live2d.playing) live2d.togglePlay()
   isScrubbing.value = true
   scrubPointerId = e.pointerId
   ;(e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId)
@@ -381,16 +476,22 @@ function curveX(t: number, d: number): number {
         <button
           type="button"
           class="play"
-          :disabled="!hasSpine"
-          :title="hasSpine ? (spine.playing ? t('暂停', 'Pause') : t('播放', 'Play')) : t('需导入 Spine 多文件包', 'Import Spine bundle required')"
-          @click="spine.togglePlay()"
+          :disabled="!hasTimeline"
+          :title="
+            hasTimeline
+              ? timelinePlaying
+                ? t('暂停', 'Pause')
+                : t('播放', 'Play')
+              : t('需导入 Spine、DragonBones 或 Live2D zip', 'Import Spine, DragonBones, or Live2D zip')
+          "
+          @click="togglePlayAny()"
         >
-          {{ spine.playing ? '⏸' : '▶' }}
+          {{ timelinePlaying ? '⏸' : '▶' }}
         </button>
-        <label v-if="hasSpine && spine.animationNames.length" class="anim-label">
+        <label v-if="hasTimeline && timelineAnimOptions.length" class="anim-label">
           <span class="anim-caption">{{ t('动画', 'Animation') }}</span>
-          <select class="anim-select" :value="spine.currentAnimation ?? ''" @change="onAnimChange">
-            <option v-for="n in spine.animationNames" :key="n" :value="n">{{ n }}</option>
+          <select class="anim-select" :value="timelineAnimKey" @change="onAnimChange">
+            <option v-for="opt in timelineAnimOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
           </select>
         </label>
       </div>
@@ -427,8 +528,8 @@ function curveX(t: number, d: number): number {
       </div>
     </div>
     <div class="tl-track">
-      <div v-if="hasSpine && duration > 0" class="ruler" />
-      <div v-if="hasSpine && duration > 0" class="timeline-strip">
+      <div v-if="hasTimeline && duration > 0" class="ruler" />
+      <div v-if="hasTimeline && duration > 0" class="timeline-strip">
         <span class="timeline-name" :title="t('时间线', 'timeline')">{{ t('时间线', 'timeline') }}</span>
         <span class="timeline-time" :aria-label="t('动画时间', 'Animation time')">{{ fmt(time) }} / {{ fmt(duration) }}s</span>
         <div
@@ -449,7 +550,7 @@ function curveX(t: number, d: number): number {
           <div class="playhead" :style="{ left: `${(progress * 100).toFixed(2)}%` }" />
         </div>
       </div>
-      <div v-if="hasSpine && duration > 0" class="subpanel" role="tabpanel">
+      <div v-if="useSpineTimeline && duration > 0" class="subpanel" role="tabpanel">
         <div v-if="tab === 'dope'" class="dope">
           <div v-if="!dopeRows.length" class="muted pad">{{ t('当前动画无可显示的通道。', 'No channels to show for this animation.') }}</div>
           <div
@@ -467,7 +568,7 @@ function curveX(t: number, d: number): number {
                   class="kf"
                   :style="{ left: `${(t / duration) * 100}%` }"
                   :title="`${r.label}\\n@ ${fmt(t)}s`"
-                  @click="spine.seek(t)"
+                  @click="seekOnly(t)"
                 />
               </div>
             </div>
@@ -552,8 +653,29 @@ function curveX(t: number, d: number): number {
           </svg>
         </div>
       </div>
+      <p v-else-if="hasTimeline && duration > 0 && timelineSource === 'db'" class="placeholder">
+        {{
+          t(
+            'DragonBones：可播放/暂停与拖动时间线；摄影表与曲线仅 Spine 支持。',
+            'DragonBones: play/pause and scrub timeline; dope sheet and curves are Spine-only.',
+          )
+        }}
+      </p>
+      <p v-else-if="hasTimeline && timelineSource === 'live2d'" class="placeholder">
+        {{
+          t(
+            'Live2D：可在上方选择 Cubism 动作、播放/暂停并在有时间轴长度时拖动进度；摄影表与曲线仍仅 Spine 支持。',
+            'Live2D: pick a Cubism motion, play/pause, and scrub when duration is known; dope sheet and curves remain Spine-only.',
+          )
+        }}
+      </p>
       <p v-else class="placeholder">
-        {{ t('导入 Spine（JSON + .atlas + 贴图多选）后可在此选择动画并播放/暂停。', 'Import Spine (multi-select JSON + .atlas + textures) to choose and play animations here.') }}
+        {{
+          t(
+            '导入 Spine（JSON + .atlas + 贴图）、DragonBones（*_ske.json + *_tex.json + PNG）多文件，或 Live2D（zip）后可在此选择动画并播放/暂停。',
+            'Import Spine (JSON + atlas + textures), DragonBones bundle, or Live2D zip to pick animations and play/pause.',
+          )
+        }}
       </p>
     </div>
   </footer>

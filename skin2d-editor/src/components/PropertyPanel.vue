@@ -18,6 +18,14 @@ const summary = computed(() => {
   if (r.versionHint) lines.push(`${t('版本/提示', 'Version/Hint')}: ${r.versionHint}`)
   if (r.skeletonName) lines.push(`${t('骨架名', 'Skeleton')}: ${r.skeletonName}`)
   if (r.boneCount != null) lines.push(`${t('骨骼数', 'Bones')}: ${r.boneCount}`)
+  if (r.formatId === 'live2d') {
+    if (r.live2dParameterCount != null) {
+      lines.push(`${t('参数（Cubism）', 'Parameters (Cubism)')}: ${r.live2dParameterCount}`)
+    }
+    if (r.live2dPartCount != null) {
+      lines.push(`${t('部件（Cubism）', 'Parts (Cubism)')}: ${r.live2dPartCount}`)
+    }
+  }
   if (r.slotCount != null) lines.push(`${t('插槽数', 'Slots')}: ${r.slotCount}`)
   if (r.skinCount != null) lines.push(`${t('皮肤数', 'Skins')}: ${r.skinCount}`)
   if (r.animationNames?.length) {
